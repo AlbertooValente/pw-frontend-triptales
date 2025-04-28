@@ -19,29 +19,24 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FrontendtriptalesTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                App()
             }
         }
     }
 }
 
+//FUNZIONE AVVIO APP
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
+fun App() {
+
 }
 
+
+//PREVIEW
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
     FrontendtriptalesTheme {
-        Greeting("Android")
+        App()
     }
 }
