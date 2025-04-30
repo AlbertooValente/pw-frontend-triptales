@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
@@ -43,7 +45,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            FrontendtriptalesTheme {
+            FrontendtriptalesTheme (
+                dynamicColor = false
+            ){
                 AppLogin()
             }
         }
@@ -53,14 +57,14 @@ class MainActivity : ComponentActivity() {
 //FUNZIONE AVVIO APP
 @Composable
 fun AppLogin() {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    //tiene traccia del tab selezionato (0 = login, 1 = registrazione)
+    var selectedTab by remember { mutableStateOf(0) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-    ){
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -68,93 +72,258 @@ fun AppLogin() {
                 .fillMaxWidth(0.9f)
                 .align(Alignment.Center)
                 .padding(16.dp)
-        ){
+        ) {
             Text(
-                text="TripTales",
+                text = "TripTales",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
+
             Spacer(modifier = Modifier.height(40.dp))
 
-            //campo username
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                placeholder = { Text("Inserisci il tuo username") },
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Username Icon"
-                    )
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            //campo password
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                placeholder = { Text("Inserisci la tua password") },
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Password Icon"
-                    )
-                },
-
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-
-            //pulsante LOGIN
-            Button(
-                onClick = { /* TO DO */ },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(
-                    "ACCEDI",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-
-            //opzione per registrarsi
+            //menu tab per la selezione tra login e registrazione
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Non hai un account? ",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "Registrati",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { /* TO DO */ }
-                )
+                //tab login
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedTab = 0 }
+                        .padding(vertical = 12.dp),
+
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Login",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            color = if (selectedTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        if (selectedTab == 0) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(40.dp)
+                                    .height(3.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = RoundedCornerShape(1.5.dp)
+                                    )
+                            )
+                        }
+                    }
+                }
+
+                //tab registrazione
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedTab = 1 }
+                        .padding(vertical = 12.dp),
+
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Registrati",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            color = if (selectedTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        if (selectedTab == 1) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(40.dp)
+                                    .height(3.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = RoundedCornerShape(1.5.dp)
+                                    )
+                            )
+                        }
+                    }
+                }
             }
+            Spacer(modifier = Modifier.height(24.dp))
+
+            when (selectedTab) {
+                0 -> LoginForm()
+                1 -> RegistrationForm()
+            }
+        }
+    }
+}
+
+@Composable
+fun LoginForm() {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Username") },
+            placeholder = { Text("Inserisci il tuo username") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Username Icon"
+                )
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            placeholder = { Text("Inserisci la tua password") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Password Icon"
+                )
+            },
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = { /* TODO */ },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Text(
+                "ACCEDI",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+    }
+}
+
+@Composable
+fun RegistrationForm() {
+    var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Username") },
+            placeholder = { Text("Scegli uno username") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Username Icon"
+                )
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            placeholder = { Text("Inserisci la tua email") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Email,
+                    contentDescription = "Email Icon"
+                )
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            placeholder = { Text("Crea una password") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Password Icon"
+                )
+            },
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = confirmPassword,
+            onValueChange = { confirmPassword = it },
+            label = { Text("Conferma Password") },
+            placeholder = { Text("Conferma la tua password") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Confirm Password Icon"
+                )
+            },
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = { /* TODO */ },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Text(
+                "REGISTRATI",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                )
+            )
         }
     }
 }
@@ -164,7 +333,10 @@ fun AppLogin() {
 @Preview(showBackground = true)
 @Composable
 fun TripTalesPreview() {
-    FrontendtriptalesTheme {
+    FrontendtriptalesTheme(
+        darkTheme = false,
+        dynamicColor = false
+    ) {
         AppLogin()
     }
 }
