@@ -31,14 +31,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.frontend_triptales.ui.theme.FrontendtriptalesTheme
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,15 +55,49 @@ class MainActivity : ComponentActivity() {
             FrontendtriptalesTheme (
                 dynamicColor = false
             ){
-                AppLogin()
+                AppNav()
             }
         }
     }
 }
 
-//FUNZIONE AVVIO APP
+//mantiene loggato l'utente per tutta la durata della sessione di utilizzo dell'app
+object AuthManager {
+    var token: String? = null
+}
+
 @Composable
-fun AppLogin() {
+fun AppNav(){
+    val navController = rememberNavController()
+    val tripTalesApi = RetrofitInstance.api
+    val coroutineScope = rememberCoroutineScope()
+
+    NavHost(navController = navController, startDestination = "auth") {
+        composable("auth") {
+            AppLogin(
+                api = tripTalesApi,
+                coroutineScope = coroutineScope,
+                onLoginSuccess = {
+                    navController.navigate("home") {
+                        popUpTo("auth") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable("home") {
+            Home()
+        }
+    }
+}
+
+
+@Composable
+fun AppLogin(
+    api: TripTalesApi,
+    coroutineScope: CoroutineScope,
+    onLoginSuccess: () -> Unit
+) {
     //tiene traccia del tab selezionato (0 = login, 1 = registrazione)
     var selectedTab by remember { mutableStateOf(0) }
 
@@ -99,7 +140,7 @@ fun AppLogin() {
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Login",
+                            text = "Accedi",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
                             ),
@@ -155,17 +196,30 @@ fun AppLogin() {
             Spacer(modifier = Modifier.height(24.dp))
 
             when (selectedTab) {
-                0 -> LoginForm()
-                1 -> RegistrationForm()
+                0 -> LoginForm(
+                    coroutineScope,
+                    api,
+                    onLoginSuccess = onLoginSuccess
+                )
+                1 -> RegistrationForm(
+                    coroutineScope,
+                    api,
+                    onLoginSuccess = onLoginSuccess
+                )
             }
         }
     }
 }
 
 @Composable
-fun LoginForm() {
+fun LoginForm(
+    coroutineScope: CoroutineScope,
+    apiService: TripTalesApi,
+    onLoginSuccess: () -> Unit
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -207,7 +261,29 @@ fun LoginForm() {
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
-            onClick = { /* TODO */ },
+            onClick = {
+                coroutineScope.launch{
+                    try{
+                        val response = apiService.login(LoginRequest(username, password))
+
+                        if(response.isSuccessful){
+                            val token = response.body()?.token
+
+                            if(!token.isNullOrEmpty()){
+                                AuthManager.token = token
+
+                                onLoginSuccess()
+                            }
+                        }
+                        else{
+                            errorMessage = "Credenziali non valide"
+                        }
+                    }
+                    catch(e: Exception){
+                        errorMessage = "Errore di rete"
+                    }
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -224,15 +300,24 @@ fun LoginForm() {
                 )
             )
         }
+
+        errorMessage?.let {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = it, color = Color.Red)
+        }
     }
 }
 
 @Composable
-fun RegistrationForm() {
+fun RegistrationForm(
+    coroutineScope: CoroutineScope,
+    apiService: TripTalesApi,
+    onLoginSuccess: () -> Unit
+) {
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -288,28 +373,32 @@ fun RegistrationForm() {
             singleLine = true,
             shape = RoundedCornerShape(12.dp)
         )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = confirmPassword,
-            onValueChange = { confirmPassword = it },
-            label = { Text("Conferma Password") },
-            placeholder = { Text("Conferma la tua password") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = "Confirm Password Icon"
-                )
-            },
-            visualTransformation = PasswordVisualTransformation(),
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp)
-        )
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
-            onClick = { /* TODO */ },
+            onClick = {
+                coroutineScope.launch {
+                    try{
+                        val response = apiService.register(User(username, email, password, "", null))
+
+                        if(response.isSuccessful){
+                            val token = response.body()?.token
+
+                            if(!token.isNullOrEmpty()){
+                                AuthManager.token = token
+
+                                onLoginSuccess()
+                            }
+                        }
+                        else{
+                            errorMessage = "Credenziali non valide"
+                        }
+                    }
+                    catch(e: Exception){
+                        errorMessage = "Errore di rete: ${e.localizedMessage}"
+                    }
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -325,6 +414,11 @@ fun RegistrationForm() {
                 )
             )
         }
+
+        errorMessage?.let {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = it, color = Color.Red)
+        }
     }
 }
 
@@ -337,6 +431,6 @@ fun TripTalesPreview() {
         darkTheme = false,
         dynamicColor = false
     ) {
-        AppLogin()
+        AppNav()
     }
 }
