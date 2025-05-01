@@ -84,6 +84,7 @@ object AuthManager {
     var token: String? = null
 }
 
+//gestisce la navigazione tra le varie pagine dell'applicazione
 @Composable
 fun AppNav(){
     val navController = rememberNavController()
@@ -104,7 +105,7 @@ fun AppNav(){
         }
 
         composable("home") {
-            Home(tripTalesApi)
+            Home(tripTalesApi, coroutineScope, navController)
         }
     }
 }
