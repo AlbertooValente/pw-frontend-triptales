@@ -1,10 +1,16 @@
 package com.example.frontend_triptales
 
+import android.content.Context
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,9 +21,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -35,7 +44,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -44,8 +56,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,7 +104,7 @@ fun AppNav(){
         }
 
         composable("home") {
-            Home()
+            Home(tripTalesApi)
         }
     }
 }
@@ -317,7 +335,15 @@ fun RegistrationForm(
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var bio by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    //per ottenere l'immagine avatar
+    val context = LocalContext.current
+    var avatarUri by remember { mutableStateOf<Uri?>(null) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        avatarUri = uri
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -373,29 +399,129 @@ fun RegistrationForm(
             singleLine = true,
             shape = RoundedCornerShape(12.dp)
         )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = bio,
+            onValueChange = { bio = it },
+            label = { Text("Biografia") },
+            placeholder = { Text("Inserisci una breve biografia") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = false,
+            shape = RoundedCornerShape(12.dp),
+            maxLines = 4
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        //box per inserire l'immagine avatar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .clickable { launcher.launch("image/*") }
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (avatarUri != null) {    //se l'utente ha selezionato un'immagine
+                Image(
+                    painter = rememberAsyncImagePainter(avatarUri),
+                    contentDescription = "Avatar Selezionato",
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .border(
+                                width = 2.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            )
+                            .padding(8.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Immagine profilo",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Tocca per selezionare",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = {
                 coroutineScope.launch {
                     try{
-                        val response = apiService.register(User(username, email, password, "", null))
+                        //prepara i campi di testo come RequestBody
+                        val usernamePart = username.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val emailPart = email.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val passwordPart = password.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val bioPart = bio.toRequestBody("text/plain".toMediaTypeOrNull())
 
-                        if(response.isSuccessful){
+                        //prepara l'avatar solo se selezionato
+                        val avatarPart = if (avatarUri != null) {
+                            val file = createPngFileFromUri(context, avatarUri!!)
+
+                            if (file == null) {
+                                errorMessage = "Errore nel caricare l'immagine."
+                                return@launch
+                            }
+
+                            val requestImageFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+                            MultipartBody.Part.createFormData("avatar", file.name, requestImageFile)
+                        } else {
+                            null    //nessuna immagine selezionata
+                        }
+
+                        //effettua la richiesta con o senza avatar
+                        val response = apiService.register(
+                            usernamePart,
+                            emailPart,
+                            passwordPart,
+                            bioPart,
+                            avatarPart
+                        )
+
+                        //gestione risposta
+                        if (response.isSuccessful) {
                             val token = response.body()?.token
 
-                            if(!token.isNullOrEmpty()){
+                            if (!token.isNullOrEmpty()) {
                                 AuthManager.token = token
-
                                 onLoginSuccess()
                             }
-                        }
-                        else{
-                            errorMessage = "Credenziali non valide"
+                        } else {
+                            errorMessage = "Registrazione fallita"
                         }
                     }
                     catch(e: Exception){
-                        errorMessage = "Errore di rete: ${e.localizedMessage}"
+                        errorMessage = "Errore di rete: ${e.localizedMessage}"  //modifica a fine progetto
                     }
                 }
             },
@@ -420,6 +546,18 @@ fun RegistrationForm(
             Text(text = it, color = Color.Red)
         }
     }
+}
+
+//crea il file PNG dall'URI dell'immagine selezionata
+fun createPngFileFromUri(context: Context, uri: Uri): File? {
+    val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+    val tempFile = File(context.cacheDir, "avatar.png")
+
+    tempFile.outputStream().use { output ->
+        inputStream.copyTo(output)
+    }
+
+    return tempFile
 }
 
 

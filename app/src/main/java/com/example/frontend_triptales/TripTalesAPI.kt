@@ -1,5 +1,7 @@
 package com.example.frontend_triptales
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
 import retrofit2.Retrofit
@@ -9,8 +11,15 @@ data class LoginRequest(val username: String, val password: String)
 data class TokenResponse(val token: String)
 
 interface TripTalesApi {
+    @Multipart
     @POST("users/register/")
-    suspend fun register(@Body user: User): Response<TokenResponse>
+    suspend fun register(
+        @Part("username") username: RequestBody,
+        @Part("email") email: RequestBody,
+        @Part("password") password: RequestBody,
+        @Part("bio") bio: RequestBody,
+        @Part avatar: MultipartBody.Part?
+    ): Response<TokenResponse>
 
     @POST("users/login/")
     suspend fun login(@Body request: LoginRequest): Response<TokenResponse>
@@ -25,10 +34,16 @@ interface TripTalesApi {
     ): Response<User>
 }
 
+
+//salvo l'ip del server come variabile globale
+object Constants {
+    const val BASE_URL = "http://192.168.1.3:8000"  //da sostituire ogni volta con l'ip del backend
+}
+
 object RetrofitInstance {
     val api: TripTalesApi by lazy {
         Retrofit.Builder()
-            .baseUrl("http://192.168.1.3:8000/")
+            .baseUrl("${Constants.BASE_URL}/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(TripTalesApi::class.java)
