@@ -1,10 +1,8 @@
 package com.example.frontend_triptales
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -19,9 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,26 +34,19 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -66,33 +55,12 @@ import kotlinx.coroutines.launch
 fun Home(
     api: TripTalesApi,
     coroutineScope: CoroutineScope,
-    navController: NavController
+    navController: NavController,
+    userViewModel: UserViewModel
 ){
-    var user by remember { mutableStateOf<User?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showProfileMenu by remember { mutableStateOf(false) }   //gestisce il menu del profilo
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)    //controlla se l'elemento drawer è aperto o chiuso
-
-    //recupera i dati dell'utente
-    LaunchedEffect(Unit) {
-        val token = AuthManager.token
-
-        if (token != null) {
-            coroutineScope.launch {
-                try {
-                    val response = api.getUser("Token $token")
-
-                    if (response.isSuccessful) {
-                        user = response.body()
-                    } else {
-                        errorMessage = "Errore nel recupero del profilo"
-                    }
-                } catch (e: Exception) {
-                    errorMessage = "Errore di rete: ${e.localizedMessage}"
-                }
-            }
-        }
-    }
 
     //menu laterale a comparsa
     ModalNavigationDrawer(
@@ -166,9 +134,9 @@ fun Home(
                             IconButton(
                                 onClick = { showProfileMenu = !showProfileMenu }    //cliccando sull'immagine profilo compare un menu
                             ) {
-                                if (user?.avatar != null) {     //mostra l'immagine del profilo (se presente)
+                                if (userViewModel.user?.avatar != null) {     //mostra l'immagine del profilo (se presente)
                                     AsyncImage(
-                                        model = Constants.BASE_URL + user?.avatar,
+                                        model = Constants.BASE_URL + userViewModel.user?.avatar,
                                         contentDescription = "Profilo",
                                         modifier = Modifier
                                             .size(32.dp)
@@ -248,7 +216,7 @@ fun Home(
                         modifier = Modifier.padding(top = 16.dp)
                     ) {
                         Text(
-                            text = user?.username?.let { "Bacheca di $it" } ?: "Caricamento...",
+                            text = userViewModel.user?.username?.let { "Bacheca di $it" } ?: "Caricamento...",
                             style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -266,4 +234,15 @@ fun handleLogout(navController: NavController) {
     navController.navigate("auth") {
         popUpTo("home") { inclusive = true }
     }
+}
+
+//pagina di modifica del profilo utente
+@Composable
+fun editProfile(
+    api: TripTalesApi,
+    coroutineScope: CoroutineScope,
+    navController: NavController,
+    userViewModel: UserViewModel
+){
+
 }

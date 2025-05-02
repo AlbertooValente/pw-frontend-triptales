@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +54,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.frontend_triptales.ui.theme.FrontendtriptalesTheme
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -90,6 +92,7 @@ fun AppNav(){
     val navController = rememberNavController()
     val tripTalesApi = RetrofitInstance.api
     val coroutineScope = rememberCoroutineScope()
+    val user: UserViewModel = viewModel()
 
     NavHost(navController = navController, startDestination = "auth") {
         composable("auth") {
@@ -97,6 +100,8 @@ fun AppNav(){
                 api = tripTalesApi,
                 coroutineScope = coroutineScope,
                 onLoginSuccess = {
+                    user.loadUser(tripTalesApi, AuthManager.token)
+
                     navController.navigate("home") {
                         popUpTo("auth") { inclusive = true }
                     }
@@ -105,12 +110,16 @@ fun AppNav(){
         }
 
         composable("home") {
-            Home(tripTalesApi, coroutineScope, navController)
+            Home(tripTalesApi, coroutineScope, navController, user)
+        }
+
+        composable("edit_profile"){
+            editProfile(tripTalesApi, coroutineScope, navController, user)
         }
     }
 }
 
-
+//pagina di login/registrazione
 @Composable
 fun AppLogin(
     api: TripTalesApi,
@@ -322,7 +331,7 @@ fun LoginForm(
 
         errorMessage?.let {
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = it, color = Color.Red)
+            Text(text = it, color = MaterialTheme.colorScheme.error)
         }
     }
 }
@@ -544,7 +553,7 @@ fun RegistrationForm(
 
         errorMessage?.let {
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = it, color = Color.Red)
+            Text(text = it, color = MaterialTheme.colorScheme.error)
         }
     }
 }
