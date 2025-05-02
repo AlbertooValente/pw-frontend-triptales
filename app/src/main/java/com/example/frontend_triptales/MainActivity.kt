@@ -37,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -114,7 +112,7 @@ fun AppNav(){
         }
 
         composable("edit_profile"){
-            editProfile(tripTalesApi, coroutineScope, navController, user)
+            EditProfile(tripTalesApi, coroutineScope, navController, user)
         }
     }
 }
@@ -170,11 +168,17 @@ fun AppLogin(
                         Text(
                             text = "Accedi",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
+                                fontWeight = if(selectedTab == 0)
+                                    FontWeight.Bold
+                                else
+                                    FontWeight.Normal
                             ),
-                            color = if (selectedTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = if(selectedTab == 0)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
-                        if (selectedTab == 0) {
+                        if(selectedTab == 0){
                             Spacer(modifier = Modifier.height(4.dp))
                             Box(
                                 modifier = Modifier
@@ -202,11 +206,17 @@ fun AppLogin(
                         Text(
                             text = "Registrati",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
+                                fontWeight = if(selectedTab == 1)
+                                    FontWeight.Bold
+                                else
+                                    FontWeight.Normal
                             ),
-                            color = if (selectedTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = if(selectedTab == 1)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
-                        if (selectedTab == 1) {
+                        if(selectedTab == 1){
                             Spacer(modifier = Modifier.height(4.dp))
                             Box(
                                 modifier = Modifier
@@ -223,7 +233,7 @@ fun AppLogin(
             }
             Spacer(modifier = Modifier.height(24.dp))
 
-            when (selectedTab) {
+            when(selectedTab){
                 0 -> LoginForm(
                     coroutineScope,
                     api,
@@ -439,7 +449,7 @@ fun RegistrationForm(
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (avatarUri != null) {    //se l'utente ha selezionato un'immagine
+            if(avatarUri != null){    //se l'utente ha selezionato un'immagine
                 Image(
                     painter = rememberAsyncImagePainter(avatarUri),
                     contentDescription = "Avatar Selezionato",
@@ -449,7 +459,8 @@ fun RegistrationForm(
                         .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
                     contentScale = ContentScale.Crop
                 )
-            } else {
+            }
+            else{
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
@@ -495,17 +506,18 @@ fun RegistrationForm(
                         val bioPart = bio.toRequestBody("text/plain".toMediaTypeOrNull())
 
                         //prepara l'avatar solo se selezionato
-                        val avatarPart = if (avatarUri != null) {
+                        val avatarPart = if(avatarUri != null){
                             val file = createPngFileFromUri(context, avatarUri!!)
 
-                            if (file == null) {
+                            if(file == null){
                                 errorMessage = "Errore nel caricare l'immagine."
                                 return@launch
                             }
 
                             val requestImageFile = file.asRequestBody("image/*".toMediaTypeOrNull())
                             MultipartBody.Part.createFormData("avatar", file.name, requestImageFile)
-                        } else {
+                        }
+                        else{
                             null    //nessuna immagine selezionata
                         }
 
@@ -519,14 +531,15 @@ fun RegistrationForm(
                         )
 
                         //gestione risposta
-                        if (response.isSuccessful) {
+                        if(response.isSuccessful){
                             val token = response.body()?.token
 
-                            if (!token.isNullOrEmpty()) {
+                            if(!token.isNullOrEmpty()){
                                 AuthManager.token = token
                                 onLoginSuccess()
                             }
-                        } else {
+                        }
+                        else{
                             errorMessage = "Registrazione fallita"
                         }
                     }

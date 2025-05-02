@@ -27,10 +27,11 @@ interface TripTalesApi {
     @GET("users/profile/")
     suspend fun getUser(@Header("Authorization") token: String): Response<User>
 
+    @Multipart
     @PATCH("users/profile/update/")
     suspend fun updateUser(
         @Header("Authorization") token: String,
-        @Body updates: Map<String, String>
+        @Part parts: List<MultipartBody.Part>
     ): Response<User>
 }
 
