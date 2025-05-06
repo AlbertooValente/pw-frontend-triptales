@@ -6,10 +6,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,17 +30,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,13 +47,13 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -71,12 +70,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.toSize
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import kotlinx.coroutines.CoroutineScope
@@ -95,7 +100,6 @@ fun Home(
     navController: NavController,
     userViewModel: UserViewModel
 ){
-    var showProfileMenu by remember { mutableStateOf(false) }   //gestisce il menu del profilo
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)    //controlla se l'elemento drawer è aperto o chiuso
 
     //menu laterale a comparsa
@@ -164,70 +168,7 @@ fun Home(
                         }
                     },
                     actions = {
-                        Box(
-                            modifier = Modifier.wrapContentSize(Alignment.TopEnd)
-                        ) {
-                            IconButton(
-                                onClick = { showProfileMenu = !showProfileMenu }    //cliccando sull'immagine profilo compare un menu
-                            ) {
-                                if(userViewModel.user?.avatar != null){     //mostra l'immagine del profilo (se presente)
-                                    AsyncImage(
-                                        model = Constants.BASE_URL + userViewModel.user?.avatar,
-                                        contentDescription = "Profilo",
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .border(1.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
-                                        contentScale = ContentScale.Crop,
-                                        //error = painterResource(id = R.drawable.default_avatar)
-                                    )
-                                }
-                                else{
-                                    Icon(
-                                        imageVector = Icons.Default.AccountCircle,
-                                        contentDescription = "Profilo",
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            }
-
-                            DropdownMenu(   //menu a discesa attivato dal click sull'immagine profilo
-                                expanded = showProfileMenu,
-                                onDismissRequest = { showProfileMenu = false },
-                                modifier = Modifier
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .width(200.dp)
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Modifica profilo") },
-                                    onClick = {
-                                        showProfileMenu = false
-                                        navController.navigate("edit_profile")
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Edit,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                                HorizontalDivider()
-
-                                DropdownMenuItem(
-                                    text = { Text("Logout") },
-                                    onClick = {
-                                        showProfileMenu = false
-                                        handleLogout(navController)
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.ExitToApp,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-                        }
+                        ProfileMenu(navController, userViewModel)
                     }
                 )
             }
@@ -257,9 +198,85 @@ fun Home(
                             style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
+
+                        TripButtonMenu()
                     }
                 }
             }
+        }
+    }
+}
+
+//gestisce il menu del profilo
+@Composable
+fun ProfileMenu(
+    navController: NavController,
+    userViewModel: UserViewModel
+){
+    var showProfileMenu by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier.wrapContentSize(Alignment.TopEnd)
+    ) {
+        IconButton(
+            onClick = { showProfileMenu = !showProfileMenu }    //cliccando sull'immagine profilo compare un menu
+        ) {
+            if(userViewModel.user?.avatar != null){     //mostra l'immagine del profilo (se presente)
+                AsyncImage(
+                    model = Constants.BASE_URL + userViewModel.user?.avatar,
+                    contentDescription = "Profilo",
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                    contentScale = ContentScale.Crop,
+                    //error = painterResource(id = R.drawable.default_avatar)
+                )
+            }
+            else{
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "Profilo",
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+
+        DropdownMenu(   //menu a discesa attivato dal click sull'immagine profilo
+            expanded = showProfileMenu,
+            onDismissRequest = { showProfileMenu = false },
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surface)
+                .width(200.dp)
+        ) {
+            DropdownMenuItem(
+                text = { Text("Modifica profilo") },
+                onClick = {
+                    showProfileMenu = false
+                    navController.navigate("edit_profile")
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null
+                    )
+                }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            DropdownMenuItem(
+                text = { Text("Logout") },
+                onClick = {
+                    showProfileMenu = false
+                    handleLogout(navController)
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ExitToApp,
+                        contentDescription = null
+                    )
+                }
+            )
         }
     }
 }
@@ -397,13 +414,14 @@ fun EditProfile(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (isLoading) {    //caricamento
+            if(isLoading){    //caricamento
                 CircularProgressIndicator(
                     modifier = Modifier
                         .size(50.dp)
                         .align(Alignment.Center)
                 )
-            } else {
+            }
+            else{
                 //contenuto principale
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -518,11 +536,9 @@ fun EditProfile(
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
                     )
-
                     Spacer(modifier = Modifier.height(16.dp))
 
                     /*
-
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
@@ -540,7 +556,6 @@ fun EditProfile(
                         shape = RoundedCornerShape(12.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-
                      */
 
                     OutlinedTextField(
@@ -565,107 +580,25 @@ fun EditProfile(
             }
 
             //messaggio di modifica riuscita
-            AnimatedVisibility(
-                visible = showSuccessMessage,
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it })
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .align(Alignment.BottomCenter)
-                ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Text(
-                                text = "Profilo aggiornato con successo!",
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            IconButton(
-                                onClick = { showSuccessMessage = false }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Chiudi",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            MessageBanner(
+                message = "Profilo aggiornato con successo!",
+                onClose = { showSuccessMessage = false },
+                icon = Icons.Default.Check,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                visible = showSuccessMessage
+            )
 
             //messaggio di errore
-            AnimatedVisibility(
-                visible = errorMessage != null,
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it })
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .align(Alignment.BottomCenter)
-                ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Text(
-                                text = errorMessage ?: "",
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            IconButton(
-                                onClick = { errorMessage = null }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Chiudi",
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                        }
-                    }
-                }
+            errorMessage?.let {
+                MessageBanner(
+                    message = it,
+                    onClose = { errorMessage = null },
+                    icon = Icons.Default.Warning,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    visible = true
+                )
             }
         }
     }
@@ -707,4 +640,175 @@ fun EditProfile(
             }
         }
     }
+}
+
+@Composable
+fun MessageBanner(
+    message: String,
+    onClose: () -> Unit,
+    icon: ImageVector,
+    containerColor: Color,
+    contentColor: Color,
+    visible: Boolean
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it })
+    ) {
+        Box(
+            contentAlignment = Alignment.BottomCenter,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = containerColor)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = contentColor
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Text(
+                        text = message,
+                        color = contentColor
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Chiudi",
+                            tint = contentColor
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+//gestisce il pulsante e il menu per aggiungere/creare un trip
+@Composable
+fun TripButtonMenu(){
+    var expanded by remember { mutableStateOf(false) }
+    var showCreateTripDialog by remember { mutableStateOf(false) }
+    var showJoinTripDialog by remember { mutableStateOf(false) }
+
+    //variabili per tracciare la posizione del pulsante
+    var fabCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    Box(
+        contentAlignment = Alignment.BottomEnd,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Box(
+            modifier = Modifier.onGloballyPositioned { coordinates -> fabCoordinates = coordinates }
+        ) {
+            FloatingActionButton(
+                onClick = { expanded = !expanded },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Aggiungi"
+                )
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                offset = DpOffset(x = (-150).dp, y = (-185).dp),
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surface)
+                    .width(200.dp)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Crea trip") },
+                    leadingIcon = { Icon(Icons.Default.Create, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        showCreateTripDialog = true
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                DropdownMenuItem(
+                    text = { Text("Partecipa ad un trip") },
+                    leadingIcon = { Icon(Icons.Default.AddCircle, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        showJoinTripDialog = true
+                    }
+                )
+            }
+        }
+    }
+
+    if(showCreateTripDialog){
+        CreateTripDialog(onDismiss = { showCreateTripDialog = false })
+    }
+    else if(showJoinTripDialog){
+        JoinTripDialog(onDismiss = { showJoinTripDialog = false })
+    }
+}
+
+//dialog per creare un trip
+@Composable
+fun CreateTripDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Crea un nuovo trip") },
+        text = {
+            Text("Qui andrà il form per creare un trip")
+            // Qui andranno i campi del form
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Crea")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Annulla")
+            }
+        }
+    )
+}
+
+//dialog per partecipare ad un trip
+@Composable
+fun JoinTripDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Partecipa ad un trip") },
+        text = {
+            Text("Qui andrà il form per partecipare ad un trip")
+            // Qui andranno i campi del form
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Partecipa")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Annulla")
+            }
+        }
+    )
 }
