@@ -11,18 +11,21 @@ class UserViewModel : ViewModel() { //per tenere salvati i dati dell'utente
     var user by mutableStateOf<User?>(null)
         private set     //fuori dalla classe posso solo leggerlo
 
+    var trips by mutableStateOf<List<Int>?>(null)
+
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
-    //metto ? solo per non generare errore, anche se la funzione viene sempre richiamata quando il token non è null
-    fun loadUser(api: TripTalesApi, token: String?) {
+
+    fun loadUser(api: TripTalesApi) {
         viewModelScope.launch {
             try {
-                val response = api.getUser("Token $token")
+                val response = api.getUser("Token ${AuthManager.token!!}")
 
                 if(response.isSuccessful){
                     user = response.body()
                     errorMessage = null
+                    loadTrips(api)
                 }
                 else{
                     errorMessage = "Errore nel recupero del profilo"
@@ -33,6 +36,26 @@ class UserViewModel : ViewModel() { //per tenere salvati i dati dell'utente
             }
         }
     }
+
+    private fun loadTrips(api: TripTalesApi){
+        viewModelScope.launch {
+            try {
+                val response = api.getTrips("Token ${AuthManager.token!!}")
+
+                if(response.isSuccessful){
+                    trips = response.body()
+                    errorMessage = null
+                }
+                else{
+                    errorMessage = "Errore nel recupero dei trip"
+                }
+            }
+            catch(e: Exception){
+                errorMessage = "Errore di rete"
+            }
+        }
+    }
+
 
     fun logout() {
         user = null

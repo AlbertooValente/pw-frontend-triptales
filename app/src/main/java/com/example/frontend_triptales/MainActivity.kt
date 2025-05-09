@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,20 +24,34 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.example.frontend_triptales.ui.theme.FrontendtriptalesTheme
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -88,17 +104,17 @@ object AuthManager {
 @Composable
 fun AppNav(){
     val navController = rememberNavController()
-    val tripTalesApi = RetrofitInstance.api
+    val api = RetrofitInstance.api
     val coroutineScope = rememberCoroutineScope()
     val user: UserViewModel = viewModel()
 
     NavHost(navController = navController, startDestination = "auth") {
         composable("auth") {
             AppLogin(
-                api = tripTalesApi,
+                api = api,
                 coroutineScope = coroutineScope,
                 onLoginSuccess = {
-                    user.loadUser(tripTalesApi, AuthManager.token)
+                    user.loadUser(api)
 
                     navController.navigate("home") {
                         popUpTo("auth") { inclusive = true }
@@ -108,17 +124,157 @@ fun AppNav(){
         }
 
         composable("home") {
-            Home(tripTalesApi, coroutineScope, navController, user)
+            MainLayout(api, navController, user, coroutineScope) {
+                Home(api, coroutineScope, navController, user)
+            }
         }
 
         composable("edit_profile"){
-            EditProfile(tripTalesApi, coroutineScope, navController, user)
+            EditProfile(api, coroutineScope, navController, user)
         }
 
-        composable("trip"){
-            Trip(tripTalesApi, coroutineScope, navController, user)
+        composable("trip/{tripId}"){ backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString("tripId")?.toIntOrNull()
+
+            MainLayout(api, navController, user, coroutineScope){
+                TripHome(api, coroutineScope, navController, user, tripId!!)
+            }
         }
     }
+}
+
+//layout principale dell'applicazione
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainLayout(
+    api: TripTalesApi,
+    navController: NavController,
+    userViewModel: UserViewModel,
+    coroutineScope: CoroutineScope,
+    content: @Composable (PaddingValues) -> Unit
+){
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)    //controlla se l'elemento drawer è aperto o chiuso
+
+    //menu laterale a comparsa
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {   //conenuto del menu laterale
+            ModalDrawerSheet(
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.width(300.dp)
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(   //titolo del menu laterale
+                    "TripTales Menu",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                HorizontalDivider()
+
+                Column {
+                    //MODIFICAMI
+                    Text(
+                        text = "Home",
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .clickable {
+                                navController.navigate("home")
+                            },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(userViewModel.trips ?: emptyList()) { tripId ->
+                            TripDrawerItem(tripId, api, navController)
+                        }
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+            }
+        }
+    ) {
+        Scaffold(
+            topBar = {  //barra in alto nella pagina
+                TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            coroutineScope.launch { drawerState.open() }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Menu"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    title = {
+                        Text(
+                            "TripTales",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    },
+                    actions = {
+                        ProfileMenu(navController, userViewModel)
+                    }
+                )
+            }
+        ) { innerPadding ->
+            //contenuto principale della pagina
+            Box(
+                contentAlignment = Alignment.TopCenter,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                content(innerPadding)
+            }
+        }
+    }
+}
+
+@Composable
+fun TripDrawerItem(
+    tripId: Int,
+    api: TripTalesApi,
+    navController: NavController
+) {
+    var tripName by remember { mutableStateOf("Trip $tripId") }
+
+    LaunchedEffect(tripId) {
+        try {
+            val response = api.getTripInfo("Token ${AuthManager.token!!}", tripId)
+
+            if(response.isSuccessful){
+                tripName = response.body()?.name ?: "Trip $tripId"
+            }
+        }
+        catch (_: Exception) {
+            //prende il nome generico (es. trip 1)
+        }
+    }
+
+    Text(
+        text = tripName,
+        modifier = Modifier
+            .padding(16.dp)
+            .clickable {
+                navController.navigate("trip/$tripId")
+            },
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface
+    )
 }
 
 //pagina di login/registrazione
@@ -310,11 +466,10 @@ fun LoginForm(
                         val response = apiService.login(LoginRequest(username, password))
 
                         if(response.isSuccessful){
-                            val token = response.body()?.str
+                            val token = response.body()?.token
 
                             if(!token.isNullOrEmpty()){
                                 AuthManager.token = token
-
                                 onLoginSuccess()
                             }
                         }
@@ -537,7 +692,7 @@ fun RegistrationForm(
 
                         //gestione risposta
                         if(response.isSuccessful){
-                            val token = response.body()?.str
+                            val token = response.body()?.token
 
                             if(!token.isNullOrEmpty()){
                                 AuthManager.token = token

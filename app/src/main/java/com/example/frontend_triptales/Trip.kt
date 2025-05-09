@@ -4,5 +4,6 @@ data class Trip(
     val id: Int,
     val name: String,
     val description: String,
-    val members: List<User>
+    val createdBy: Int,
+    val members: List<Int>
 )

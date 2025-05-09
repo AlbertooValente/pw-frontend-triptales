@@ -10,8 +10,10 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,13 +41,13 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,15 +56,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,6 +78,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -90,7 +92,6 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Home(
     api: TripTalesApi,
@@ -98,99 +99,36 @@ fun Home(
     navController: NavController,
     userViewModel: UserViewModel
 ){
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)    //controlla se l'elemento drawer è aperto o chiuso
+    if(userViewModel.errorMessage == null){
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
+            Text(
+                text = userViewModel.user?.username?.let { "Bacheca di $it" } ?: "Caricamento...",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
 
-    //menu laterale a comparsa
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {   //conenuto del menu laterale
-            ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.width(300.dp)
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(   //titolo del menu laterale
-                    "TripTales Menu",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                HorizontalDivider()
-
-                Column {
-                    //MODIFICAMI
-                    Text(
-                        text = "Home",
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .clickable {
-                                navController.navigate("home")
-                            },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    //aggiungi qui le voci del menu laterale
+                items(userViewModel.trips ?: emptyList()) { tripId ->
+                    TripCard(tripId, api, navController)
                 }
-                Spacer(Modifier.weight(1f))
             }
+
+            TripButtonMenu(api, coroutineScope, userViewModel)
         }
-    ) {
-        Scaffold(
-            topBar = {  //barra in alto nella pagina
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    title = {
-                        Text(
-                            "TripTales",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                    },
-                    actions = {
-                        ProfileMenu(navController, userViewModel)
-                    }
-                )
-            }
-        ) { innerPadding ->
-            //contenuto principale della pagina
-            Box(
-                contentAlignment = Alignment.TopCenter,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                if(userViewModel.errorMessage == null){
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(top = 16.dp)
-                    ) {
-                        Text(
-                            text = userViewModel.user?.username?.let { "Bacheca di $it" } ?: "Caricamento...",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        //aggiungi controllo se è già iscritto a un gruppo gita
-                        TripButtonMenu(api, coroutineScope)
-                    }
-                }
-                else{
-                    Text(
-                        text = userViewModel.errorMessage ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
+    }
+    else{
+        Text(
+            text = userViewModel.errorMessage ?: "",
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -217,7 +155,6 @@ fun ProfileMenu(
                         .clip(CircleShape)
                         .border(1.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
                     contentScale = ContentScale.Crop,
-                    //error = painterResource(id = R.drawable.default_avatar)
                 )
             }
             else{
@@ -255,7 +192,7 @@ fun ProfileMenu(
                 text = { Text("Logout") },
                 onClick = {
                     showProfileMenu = false
-                    handleLogout(navController)
+                    handleLogout(navController, userViewModel)
                 },
                 leadingIcon = {
                     Icon(
@@ -269,8 +206,12 @@ fun ProfileMenu(
 }
 
 //funzione che gestisce il logout
-fun handleLogout(navController: NavController) {
+fun handleLogout(
+    navController: NavController,
+    userViewModel: UserViewModel
+){
     AuthManager.token = null
+    userViewModel.logout()
 
     navController.navigate("auth") {
         popUpTo("home") { inclusive = true }
@@ -364,10 +305,10 @@ fun EditProfile(
                                     }
 
                                     try {
-                                        val response = AuthManager.token?.let { token -> api.updateUser("Token $token", parts) }
+                                        val response = api.updateUser("Token ${AuthManager.token!!}", parts)
 
-                                        if(response != null && response.isSuccessful){
-                                            userViewModel.loadUser(api, AuthManager.token)
+                                        if(response.isSuccessful){
+                                            userViewModel.loadUser(api)
                                             showSuccessMessage = true
                                         }
                                         else{
@@ -525,7 +466,6 @@ fun EditProfile(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    /*
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
@@ -543,7 +483,6 @@ fun EditProfile(
                         shape = RoundedCornerShape(12.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                     */
 
                     OutlinedTextField(
                         value = bio,
@@ -691,7 +630,8 @@ fun MessageBanner(
 @Composable
 fun TripButtonMenu(
     api: TripTalesApi,
-    coroutineScope: CoroutineScope
+    coroutineScope: CoroutineScope,
+    userViewModel: UserViewModel
 ){
     var expanded by remember { mutableStateOf(false) }
     var showCreateTripDialog by remember { mutableStateOf(false) }
@@ -750,10 +690,10 @@ fun TripButtonMenu(
     }
 
     if(showCreateTripDialog){
-        CreateTripDialog(api, coroutineScope, onDismiss = { showCreateTripDialog = false })
+        CreateTripDialog(api, coroutineScope, userViewModel, onDismiss = { showCreateTripDialog = false })
     }
     else if(showJoinTripDialog){
-        JoinTripDialog(api, coroutineScope, onDismiss = { showJoinTripDialog = false })
+        JoinTripDialog(api, coroutineScope, userViewModel, onDismiss = { showJoinTripDialog = false })
     }
 }
 
@@ -762,6 +702,7 @@ fun TripButtonMenu(
 fun CreateTripDialog(
     api: TripTalesApi,
     coroutineScope: CoroutineScope,
+    userViewModel: UserViewModel,
     onDismiss: () -> Unit
 ){
     var name by remember { mutableStateOf("") }
@@ -815,18 +756,19 @@ fun CreateTripDialog(
                 onClick = {
                     coroutineScope.launch {
                         try{
-                            val response = AuthManager.token?.let { token -> api.createTrip("Token ${token}", CreateTripRequest(name, description)) }
+                            val response = api.createTrip("Token ${AuthManager.token!!}", CreateTripRequest(name, description))
 
-                            if(response != null && response.isSuccessful){
+                            if(response.isSuccessful){
                                 Toast.makeText(context, "Trip creato con successo!", Toast.LENGTH_SHORT).show()
+                                userViewModel.loadUser(api) //ricarico le informazioni dell'utente
                                 onDismiss()
                             }
-                            else{
-                                Toast.makeText(context, "Errore: ${response?.code()}", Toast.LENGTH_SHORT).show()
+                            else{   //DA TOGLIERE
+                                Toast.makeText(context, "Errore: ${response.code()}", Toast.LENGTH_LONG).show()
                             }
                         }
                         catch(e: Exception) {
-                            Toast.makeText(context, "Errore di rete: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Errore di rete", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -847,6 +789,7 @@ fun CreateTripDialog(
 fun JoinTripDialog(
     api: TripTalesApi,
     coroutineScope: CoroutineScope,
+    userViewModel: UserViewModel,
     onDismiss: () -> Unit
 ){
     var idText by remember { mutableStateOf("") }
@@ -884,14 +827,13 @@ fun JoinTripDialog(
                             val id = idText.toIntOrNull()
 
                             if(id != null){
-                                val response = AuthManager.token?.let { token -> api.joinTrip("Token ${token}", id) }
+                                val response = api.joinTrip("Token ${AuthManager.token!!}", id)
 
-                                if(response != null && response.isSuccessful){
-                                    val message = response.body()?.str
-                                    println("Successo: $message")
-                                }
-                                else{
-                                    println("Errore: ${response?.errorBody()?.string()}")
+                                if(response.isSuccessful){
+                                    val message = response.body()?.message
+                                    println("$message")
+                                    userViewModel.loadUser(api) //ricarico le informazioni dell'utente
+                                    onDismiss()
                                 }
                             }
                         }
@@ -910,4 +852,68 @@ fun JoinTripDialog(
             }
         }
     )
+}
+
+//elemento rappresentante un trip a cui l'utente è iscritto
+@Composable
+fun TripCard(
+    tripId: Int,
+    api: TripTalesApi,
+    navController: NavController
+){
+    var trip by remember { mutableStateOf<Trip?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(tripId) {
+        try{
+            val response = AuthManager.token?.let { token -> api.getTripInfo("Token $token", tripId) }
+
+            if(response != null && response.isSuccessful){
+                trip = response.body()
+            }
+            else{
+                error = "Errore nel recupero del gruppo"
+            }
+        }
+        catch(e: Exception){
+            error = "Errore di rete"
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clickable {
+                navController.navigate("trip/${tripId}")
+            },
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            when {
+                trip != null -> {
+                    Text(
+                        text = trip!!.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                error != null -> {
+                    Text(
+                        text = error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                else -> {
+                    Text(
+                        text = "Caricamento...",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+    }
 }

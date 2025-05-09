@@ -9,7 +9,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 //data class per le richieste
 data class LoginRequest(val username: String, val password: String)
-data class StringResponse(val str: String)
+data class TokenResponse(val token: String)
+data class MessageResponse(val message: String)
 data class CreateTripRequest(val name: String, val description: String)
 
 
@@ -23,10 +24,10 @@ interface TripTalesApi {
         @Part("password") password: RequestBody,
         @Part("bio") bio: RequestBody,
         @Part avatar: MultipartBody.Part?
-    ): Response<StringResponse>
+    ): Response<TokenResponse>
 
     @POST("users/login/")
-    suspend fun login(@Body request: LoginRequest): Response<StringResponse>
+    suspend fun login(@Body request: LoginRequest): Response<TokenResponse>
 
     @GET("users/profile/")
     suspend fun getUser(@Header("Authorization") token: String): Response<User>
@@ -38,6 +39,10 @@ interface TripTalesApi {
         @Part parts: List<MultipartBody.Part>
     ): Response<User>
 
+    @GET("users/my-trips/")
+    suspend fun getTrips(@Header("Authorization") token: String): Response<List<Int>>
+
+
     //TRIPS
     @POST("trips/create/")
     suspend fun createTrip(
@@ -45,24 +50,26 @@ interface TripTalesApi {
         @Body trip: CreateTripRequest
     ): Response<Trip>
 
+    @GET("trips/info/{id}/")
+    suspend fun getTripInfo(
+        @Header("Authorization") token: String,
+        @Path("id") tripId: Int
+    ): Response<Trip>
+
     @POST("trips/join/{id}/")
     suspend fun joinTrip(
         @Header("Authorization") token: String,
         @Path("id") tripId: Int
-    ): Response<StringResponse>
-
-    /*
+    ): Response<MessageResponse>
 
     @GET("trips/{id}/posts/")
-    suspend fun getPosts(@Header("Authorization") token: String): Response<>
-
-     */
+    suspend fun getPosts(@Header("Authorization") token: String): Response<List<Post>>
 }
 
 
 //salvo l'ip del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.1.2:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "http://192.168.1.4:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {
