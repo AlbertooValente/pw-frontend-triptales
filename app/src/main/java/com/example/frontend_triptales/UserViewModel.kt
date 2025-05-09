@@ -19,13 +19,16 @@ class UserViewModel : ViewModel() { //per tenere salvati i dati dell'utente
         viewModelScope.launch {
             try {
                 val response = api.getUser("Token $token")
-                if (response.isSuccessful) {
+
+                if(response.isSuccessful){
                     user = response.body()
                     errorMessage = null
-                } else {
+                }
+                else{
                     errorMessage = "Errore nel recupero del profilo"
                 }
-            } catch (e: Exception) {
+            }
+            catch(e: Exception){
                 errorMessage = "Errore di rete"
             }
         }

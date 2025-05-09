@@ -7,10 +7,14 @@ import retrofit2.http.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
+//data class per le richieste
 data class LoginRequest(val username: String, val password: String)
-data class TokenResponse(val token: String)
+data class StringResponse(val str: String)
+data class CreateTripRequest(val name: String, val description: String)
+
 
 interface TripTalesApi {
+    //USERS
     @Multipart
     @POST("users/register/")
     suspend fun register(
@@ -19,10 +23,10 @@ interface TripTalesApi {
         @Part("password") password: RequestBody,
         @Part("bio") bio: RequestBody,
         @Part avatar: MultipartBody.Part?
-    ): Response<TokenResponse>
+    ): Response<StringResponse>
 
     @POST("users/login/")
-    suspend fun login(@Body request: LoginRequest): Response<TokenResponse>
+    suspend fun login(@Body request: LoginRequest): Response<StringResponse>
 
     @GET("users/profile/")
     suspend fun getUser(@Header("Authorization") token: String): Response<User>
@@ -33,12 +37,32 @@ interface TripTalesApi {
         @Header("Authorization") token: String,
         @Part parts: List<MultipartBody.Part>
     ): Response<User>
+
+    //TRIPS
+    @POST("trips/create/")
+    suspend fun createTrip(
+        @Header("Authorization") token: String,
+        @Body trip: CreateTripRequest
+    ): Response<Trip>
+
+    @POST("trips/join/{id}/")
+    suspend fun joinTrip(
+        @Header("Authorization") token: String,
+        @Path("id") tripId: Int
+    ): Response<StringResponse>
+
+    /*
+
+    @GET("trips/{id}/posts/")
+    suspend fun getPosts(@Header("Authorization") token: String): Response<>
+
+     */
 }
 
 
 //salvo l'ip del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.1.8:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "http://192.168.1.2:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {

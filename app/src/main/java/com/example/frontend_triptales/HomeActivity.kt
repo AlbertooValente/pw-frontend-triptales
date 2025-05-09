@@ -1,6 +1,7 @@
 package com.example.frontend_triptales
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -9,7 +10,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,9 +34,9 @@ import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -70,18 +70,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.toSize
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import kotlinx.coroutines.CoroutineScope
@@ -155,18 +153,6 @@ fun Home(
                             )
                         )
                     },
-                    navigationIcon = {  //gestione dell'icona del menu laterale e del click su di essa
-                        IconButton(onClick = {
-                            coroutineScope.launch {
-                                if (drawerState.isClosed) drawerState.open() else drawerState.close()
-                            }
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu"
-                            )
-                        }
-                    },
                     actions = {
                         ProfileMenu(navController, userViewModel)
                     }
@@ -180,15 +166,7 @@ fun Home(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                if(userViewModel.errorMessage != null){
-                    Text(
-                        text = userViewModel.errorMessage ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
-                else{
+                if(userViewModel.errorMessage == null){
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(top = 16.dp)
@@ -199,8 +177,17 @@ fun Home(
                             color = MaterialTheme.colorScheme.primary
                         )
 
-                        TripButtonMenu()
+                        //aggiungi controllo se è già iscritto a un gruppo gita
+                        TripButtonMenu(api, coroutineScope)
                     }
+                }
+                else{
+                    Text(
+                        text = userViewModel.errorMessage ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -302,7 +289,7 @@ fun EditProfile(
     val user = userViewModel.user
     var username by remember { mutableStateOf(user?.username ?: "") }
     var email by remember { mutableStateOf(user?.email ?: "") }
-    //var password by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf(user?.bio ?: "") }
     var avatarUri by remember { mutableStateOf<Uri?>(user?.avatar?.toUri()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -359,10 +346,10 @@ fun EditProfile(
 
                                 val parts = mutableListOf<MultipartBody.Part>()
 
-                                if(username.isNotBlank() && email.isNotBlank() /*&& password.isNotBlank()*/ && bio.isNotBlank()){
+                                if(username.isNotBlank() && email.isNotBlank() && password.isNotBlank() && bio.isNotBlank()){
                                     if(username.isNotBlank()) parts.add(MultipartBody.Part.createFormData("username", username))
                                     if(email.isNotBlank()) parts.add(MultipartBody.Part.createFormData("email", email))
-                                    //if(password.isNotBlank()) parts.add(MultipartBody.Part.createFormData("password", password))
+                                    if(password.isNotBlank()) parts.add(MultipartBody.Part.createFormData("password", password))
                                     if(bio.isNotBlank()) parts.add(MultipartBody.Part.createFormData("bio", bio))
 
                                     //aggiunge l'immagine se presente
@@ -702,7 +689,10 @@ fun MessageBanner(
 
 //gestisce il pulsante e il menu per aggiungere/creare un trip
 @Composable
-fun TripButtonMenu(){
+fun TripButtonMenu(
+    api: TripTalesApi,
+    coroutineScope: CoroutineScope
+){
     var expanded by remember { mutableStateOf(false) }
     var showCreateTripDialog by remember { mutableStateOf(false) }
     var showJoinTripDialog by remember { mutableStateOf(false) }
@@ -760,30 +750,92 @@ fun TripButtonMenu(){
     }
 
     if(showCreateTripDialog){
-        CreateTripDialog(onDismiss = { showCreateTripDialog = false })
+        CreateTripDialog(api, coroutineScope, onDismiss = { showCreateTripDialog = false })
     }
     else if(showJoinTripDialog){
-        JoinTripDialog(onDismiss = { showJoinTripDialog = false })
+        JoinTripDialog(api, coroutineScope, onDismiss = { showJoinTripDialog = false })
     }
 }
 
 //dialog per creare un trip
 @Composable
-fun CreateTripDialog(onDismiss: () -> Unit) {
+fun CreateTripDialog(
+    api: TripTalesApi,
+    coroutineScope: CoroutineScope,
+    onDismiss: () -> Unit
+){
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Crea un nuovo trip") },
         text = {
-            Text("Qui andrà il form per creare un trip")
-            // Qui andranno i campi del form
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nome") },
+                    placeholder = { Text("Inserisci il nome del trip") },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Name Icon"
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Descrizione") },
+                    placeholder = { Text("Inserisci la descrizione del trip") },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Description Icon"
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = {
+                    coroutineScope.launch {
+                        try{
+                            val response = AuthManager.token?.let { token -> api.createTrip("Token ${token}", CreateTripRequest(name, description)) }
+
+                            if(response != null && response.isSuccessful){
+                                Toast.makeText(context, "Trip creato con successo!", Toast.LENGTH_SHORT).show()
+                                onDismiss()
+                            }
+                            else{
+                                Toast.makeText(context, "Errore: ${response?.code()}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        catch(e: Exception) {
+                            Toast.makeText(context, "Errore di rete: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            ){
                 Text("Crea")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss){
                 Text("Annulla")
             }
         }
@@ -792,21 +844,68 @@ fun CreateTripDialog(onDismiss: () -> Unit) {
 
 //dialog per partecipare ad un trip
 @Composable
-fun JoinTripDialog(onDismiss: () -> Unit) {
+fun JoinTripDialog(
+    api: TripTalesApi,
+    coroutineScope: CoroutineScope,
+    onDismiss: () -> Unit
+){
+    var idText by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Partecipa ad un trip") },
         text = {
-            Text("Qui andrà il form per partecipare ad un trip")
-            // Qui andranno i campi del form
+            OutlinedTextField(
+                value = idText,
+                onValueChange = { newValue ->   //filtra solo i numeri
+                    if (newValue.all { it.isDigit() }) {
+                        idText = newValue
+                    }
+                },
+                label = { Text("Id trip") },
+                placeholder = { Text("Inserisci l'id del trip") },
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Id Icon"
+                    )
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = {
+                    coroutineScope.launch {
+                        try{
+                            val id = idText.toIntOrNull()
+
+                            if(id != null){
+                                val response = AuthManager.token?.let { token -> api.joinTrip("Token ${token}", id) }
+
+                                if(response != null && response.isSuccessful){
+                                    val message = response.body()?.str
+                                    println("Successo: $message")
+                                }
+                                else{
+                                    println("Errore: ${response?.errorBody()?.string()}")
+                                }
+                            }
+                        }
+                        catch(e: Exception) {
+                            Toast.makeText(context, "Errore di rete: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            ){
                 Text("Partecipa")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss){
                 Text("Annulla")
             }
         }

@@ -114,6 +114,10 @@ fun AppNav(){
         composable("edit_profile"){
             EditProfile(tripTalesApi, coroutineScope, navController, user)
         }
+
+        composable("trip"){
+            Trip(tripTalesApi, coroutineScope, navController, user)
+        }
     }
 }
 
@@ -178,6 +182,7 @@ fun AppLogin(
                             else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
+
                         if(selectedTab == 0){
                             Spacer(modifier = Modifier.height(4.dp))
                             Box(
@@ -305,7 +310,7 @@ fun LoginForm(
                         val response = apiService.login(LoginRequest(username, password))
 
                         if(response.isSuccessful){
-                            val token = response.body()?.token
+                            val token = response.body()?.str
 
                             if(!token.isNullOrEmpty()){
                                 AuthManager.token = token
@@ -532,7 +537,7 @@ fun RegistrationForm(
 
                         //gestione risposta
                         if(response.isSuccessful){
-                            val token = response.body()?.token
+                            val token = response.body()?.str
 
                             if(!token.isNullOrEmpty()){
                                 AuthManager.token = token
