@@ -12,6 +12,12 @@ data class LoginRequest(val username: String, val password: String)
 data class TokenResponse(val token: String)
 data class MessageResponse(val message: String)
 data class CreateTripRequest(val name: String, val description: String)
+data class CreatePostRequest(
+    val title: String,
+    val description: String,
+    val group: Int,
+    val image: Int
+)
 
 
 interface TripTalesApi {
@@ -63,13 +69,50 @@ interface TripTalesApi {
     ): Response<MessageResponse>
 
     @GET("trips/{id}/posts/")
-    suspend fun getPosts(@Header("Authorization") token: String): Response<List<Post>>
+    suspend fun getPosts(
+        @Header("Authorization") token: String,
+        @Path("id") tripId: Int
+    ): Response<List<Post>>
+    /*
+    classifiche
+     */
+
+
+    //IMAGES
+    @Multipart
+    @POST("images/create/")
+    suspend fun caricaImage(
+        @Part image: MultipartBody.Part,
+        @Part("description") description: RequestBody,
+        @Part("latitude") latitude: RequestBody,
+        @Part("longitude") longitude: RequestBody
+    ): Response<Image>
+
+    @GET("images/{id}/")
+    suspend fun getImage(
+        @Header("Authorization") token: String,
+        @Path("id") imageId: Int
+    ): Response<Image>
+
+
+    //POSTS
+    @POST("posts/create/")
+    suspend fun creaPost(
+        @Header("Authorization") token: String,
+        @Body request: CreatePostRequest
+    ): Response<Post>
+
+    @GET("posts/{id}/")
+    suspend fun getPost(
+        @Header("Authorization") token: String,
+        @Path("id") postId: Int
+    ): Response<Post>
 }
 
 
 //salvo l'ip del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.1.4:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "http://192.168.1.7:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {

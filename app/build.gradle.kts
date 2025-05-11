@@ -45,6 +45,19 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.5")
     implementation("io.coil-kt:coil-compose:2.4.0")
 
+    //text recognition
+    implementation ("com.google.mlkit:text-recognition:16.0.1")
+
+    //language identification + translation
+    implementation ("com.google.mlkit:language-id:17.0.6")
+    implementation ("com.google.mlkit:translate:17.0.3")
+
+    //image labeling
+    implementation ("com.google.mlkit:image-labeling:17.0.9")
+
+    //smart reply
+    implementation ("com.google.mlkit:smart-reply:17.0.4")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

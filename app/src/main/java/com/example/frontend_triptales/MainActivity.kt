@@ -140,6 +140,12 @@ fun AppNav(){
                 TripHome(api, coroutineScope, navController, user, tripId!!)
             }
         }
+
+        composable("create_post/{tripId}"){ backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString("tripId")?.toIntOrNull()
+
+            CreatePostScreen(api, coroutineScope, navController, tripId!!)
+        }
     }
 }
 
@@ -173,22 +179,23 @@ fun MainLayout(
                 HorizontalDivider()
 
                 Column {
-                    //MODIFICAMI
-                    Text(
-                        text = "Home",
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .clickable {
-                                navController.navigate("home")
-                            },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        item{
+                            Text(
+                                text = "Home",
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .clickable {
+                                        navController.navigate("home")
+                                    },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
                         items(userViewModel.trips ?: emptyList()) { tripId ->
                             TripDrawerItem(tripId, api, navController)
                         }
