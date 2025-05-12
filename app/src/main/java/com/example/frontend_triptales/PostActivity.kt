@@ -2,13 +2,21 @@ package com.example.frontend_triptales
 
 import android.graphics.BitmapFactory
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,8 +28,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -69,20 +83,22 @@ fun PostDetailPage(
     var showTranslatedText by remember { mutableStateOf(false) }
 
     //caricamento post, immagine e autore
-    LaunchedEffect(postId){
-        try{
+    LaunchedEffect(postId) {
+        try {
             val postResponse = api.getPost("Token ${AuthManager.token}", postId)
 
             if(postResponse.isSuccessful){
                 post = postResponse.body()
 
-                //carica immagine
-                val imgResp = api.getImage("Token ${AuthManager.token}", post!!.image)
-                if (imgResp.isSuccessful) image = imgResp.body()
+                post?.image?.let { imageId ->
+                    val imgResp = api.getImage("Token ${AuthManager.token}", imageId)
+                    if (imgResp.isSuccessful) image = imgResp.body()
+                }
 
-                //carica autore
-                val userResp = api.getUser("Token ${AuthManager.token}")
-                if (userResp.isSuccessful) author = userResp.body()
+                post?.created_by?.let { userId ->
+                    val userResp = api.getUserById("Token ${AuthManager.token}", userId)
+                    if (userResp.isSuccessful) author = userResp.body()
+                }
             }
             else{
                 errorMessage = "Errore nel recupero del post"
@@ -93,7 +109,7 @@ fun PostDetailPage(
         }
     }
 
-    // Effettua OCR e traduzione al caricamento dell'immagine
+    //effettua OCR e traduzione al caricamento dell'immagine
     LaunchedEffect(image?.image) {
         image?.image?.let { imageUrl ->
             try {
@@ -114,8 +130,10 @@ fun PostDetailPage(
 
                     if(languageCode != "und" && languageCode != "it"){
                         val translatorOptions = TranslatorOptions.Builder()
-                            .setSourceLanguage(TranslateLanguage.fromLanguageTag(languageCode)
-                                ?: TranslateLanguage.ENGLISH)
+                            .setSourceLanguage(
+                                TranslateLanguage.fromLanguageTag(languageCode)
+                                    ?: TranslateLanguage.ENGLISH
+                            )
                             .setTargetLanguage(TranslateLanguage.ITALIAN)
                             .build()
 
@@ -136,82 +154,135 @@ fun PostDetailPage(
         }
     }
 
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Dettaglio Post") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Indietro"
+                        )
                     }
                 }
             )
         }
     ) { padding ->
-        post?.let { p ->
-            LazyColumn(modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)) {
+        if (post != null) {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(16.dp)
+            ) {
+                //titolo e descrizione post
                 item {
-                    Text(p.title, style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        text = post!!.title,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    p.description?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                    post!!.description?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
 
+                //sezione immagine
                 if(image != null){
                     item {
+                        //immagine
                         AsyncImage(
-                            model = image?.image,
-                            contentDescription = image?.description ?: "Immagine del post",
+                            model = image!!.image,
+                            contentDescription = image!!.description ?: "Immagine del post",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(1.5f)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Fit
+                                .height(300.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.FillWidth
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        image?.description?.let { desc ->
-                            Spacer(modifier = Modifier.height(8.dp))
+                        //descrizione immagine
+                        image!!.description?.let { desc ->
                             Text(
-                                desc,
+                                text = desc,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        //dettagli posizione
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+
+                            Text(
+                                text = "Lat: ${image!!.latitude} - Long: ${image!!.longitude}",
                                 style = MaterialTheme.typography.bodySmall,
-                                fontStyle = FontStyle.Italic
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            "Lat: ${image?.latitude} - Long: ${image?.longitude}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
                     }
 
-                    //se è stato rilevato del testo mostra il pulsante per vederlo
+                    //sezione text detection
                     item {
-                        if(detectedText != null){
-                            Spacer(modifier = Modifier.height(12.dp))
+                        if (detectedText != null) {
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                            TextButton(onClick = { showTranslatedText = !showTranslatedText }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Translate,
-                                    contentDescription = null
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(if (showTranslatedText) "Nascondi testo rilevato" else "Mostra testo rilevato")
-                            }
+                            Card(
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    TextButton(
+                                        onClick = { showTranslatedText = !showTranslatedText },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        colors = ButtonDefaults.textButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Translate,
+                                            contentDescription = null
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
 
-                            if(showTranslatedText){
-                                Text(
-                                    text = detectedText ?: "",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
+                                        Text(
+                                            text = if (showTranslatedText) "Nascondi testo rilevato" else "Mostra testo rilevato",
+                                            style = MaterialTheme.typography.labelLarge
+                                        )
+                                    }
+
+                                    AnimatedVisibility(
+                                        visible = showTranslatedText,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Text(
+                                            text = detectedText ?: "",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                                            modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -249,9 +320,9 @@ fun PostDetailPage(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        //data post
+                        //data pubblicazione post
                         Text(
-                            text = "Pubblicato il ${formatDate(p.created_at)}",
+                            text = "Pubblicato il ${formatDate(post!!.created_at)}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -259,13 +330,31 @@ fun PostDetailPage(
                 }
             }
         }
-
-        errorMessage?.let {
-            Text(
-                text = it,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(16.dp)
-            )
+        else if(errorMessage != null){
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        else{   //loading
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
         }
     }
 }
