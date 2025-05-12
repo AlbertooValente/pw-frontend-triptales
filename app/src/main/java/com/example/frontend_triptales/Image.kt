@@ -6,6 +6,6 @@ data class Image(
     val description: String?,
     val created_at: String,
     val created_by: Int,
-    val latitude: Double?,
-    val longitude: Double?
+    val latitude: Double,
+    val longitude: Double
 )

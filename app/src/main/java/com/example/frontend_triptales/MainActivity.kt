@@ -144,12 +144,13 @@ fun AppNav(){
         composable("create_post/{tripId}"){ backStackEntry ->
             val tripId = backStackEntry.arguments?.getString("tripId")?.toIntOrNull()
 
-            if(tripId != null){
-                CreatePostScreen(api, coroutineScope, navController, tripId)
-            }
-            else{
-                Text("Errore: tripId mancante o non valido")
-            }
+            CreatePostScreen(api, coroutineScope, navController, tripId!!)
+        }
+
+        composable("postDetailPage/{postId}"){backStackEntry ->
+            val postId = backStackEntry.arguments?.getString("postId")?.toIntOrNull()
+
+            PostDetailPage(api, postId!!, navController)
         }
     }
 }

@@ -7,6 +7,11 @@ import retrofit2.http.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
+//salvo l'ip del server come variabile globale
+object Constants {
+    const val BASE_URL = "http://192.168.1.8:8000"  //da sostituire ogni volta con l'ip del backend
+}
+
 //data class per le richieste
 data class LoginRequest(val username: String, val password: String)
 data class TokenResponse(val token: String)
@@ -114,12 +119,6 @@ interface TripTalesApi {
         @Header("Authorization") token: String,
         @Path("id") postId: Int
     ): Response<Post>
-}
-
-
-//salvo l'ip del server come variabile globale
-object Constants {
-    const val BASE_URL = "http://192.168.247.5:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {
