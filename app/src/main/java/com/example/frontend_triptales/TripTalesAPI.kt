@@ -48,6 +48,12 @@ interface TripTalesApi {
     @GET("users/my-trips/")
     suspend fun getTrips(@Header("Authorization") token: String): Response<List<Int>>
 
+    @GET("users/profile/{id}/")
+    suspend fun getUserById(
+        @Header("Authorization") token: String,
+        @Path("id") userId: Int
+    ): Response<User>
+
 
     //TRIPS
     @POST("trips/create/")
@@ -82,6 +88,7 @@ interface TripTalesApi {
     @Multipart
     @POST("images/create/")
     suspend fun caricaImage(
+        @Header("Authorization") token: String,
         @Part image: MultipartBody.Part,
         @Part("description") description: RequestBody,
         @Part("latitude") latitude: RequestBody,
@@ -112,7 +119,7 @@ interface TripTalesApi {
 
 //salvo l'ip del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.163.5:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "http://192.168.247.5:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {

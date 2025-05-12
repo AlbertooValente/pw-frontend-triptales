@@ -4,10 +4,13 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Place
@@ -34,6 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +49,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -267,6 +273,7 @@ fun Bacheca(
 }
 
 //pagina creazione post
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreatePostScreen(
     api: TripTalesApi,
@@ -275,116 +282,272 @@ fun CreatePostScreen(
     tripId: Int
 ) {
     val context = LocalContext.current
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     val imageUri = remember { mutableStateOf<Uri?>(null) }
     val postDescription = remember { mutableStateOf("") }
     val imageDescription = remember { mutableStateOf("") }
     val title = remember { mutableStateOf("") }
 
-    //prepara il file URI dove la fotocamera salverà l’immagine
-    val photoUri = remember {
-        val imageFile = File(context.cacheDir, "photo.jpg")
-        FileProvider.getUriForFile(context, "${context.packageName}.provider", imageFile)
+    //prepara il file URI dove verrà salvata l'immagine
+    val photoFile = remember {
+        File.createTempFile(
+            "photo_${System.currentTimeMillis()}_",
+            ".jpg",
+            context.cacheDir
+        )
     }
 
-    //launcher della fotocamera
+    val photoUri = remember {
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            photoFile
+        )
+    }
+
+    //camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
+    ){ success ->
+        if(success){
             imageUri.value = photoUri
         }
     }
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Crea un nuovo post", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = title.value,
-            onValueChange = { title.value = it },
-            label = { Text("Titolo") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = postDescription.value,
-            onValueChange = { postDescription.value = it },
-            label = { Text("Descrizione immagine") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(8.dp))
-
-        Button(onClick = { cameraLauncher.launch(photoUri) }) {
-            Text("Scatta foto")
+    //richiesta permessi utilizzo fotocamera
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if(isGranted){
+            try{
+                cameraLauncher.launch(photoUri)
+            }
+            catch(e: Exception){
+                errorMessage = "Errore nell'avvio della fotocamera: ${e.localizedMessage}"
+            }
         }
-        Spacer(Modifier.height(16.dp))
-
-        if(imageUri.value != null){
-            Text("Immagine selezionata")
+        else{
+            Toast.makeText(
+                context,
+                "Permesso fotocamera necessario per scattare foto",
+                Toast.LENGTH_LONG
+            ).show()
         }
-        Spacer(Modifier.height(16.dp))
+    }
 
-        Button(onClick = {
-            coroutineScope.launch {
-                try {
-                    val file = createPngFileFromUri(context, imageUri.value!!)
-                        ?: throw Exception("Impossibile leggere il file immagine")
-
-                    //analizza l'immagine con ML Kit per ottenere testo e etichette
-                    val bitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(imageUri.value!!))
-                    val analyzedText = analyzeImageWithMLKit(context, bitmap)
-                    imageDescription.value = analyzedText
-
-                    val reqFile = file.asRequestBody("image/*".toMediaTypeOrNull())
-                    val imagePart = MultipartBody.Part.createFormData("image", file.name, reqFile)
-
-                    val lat = "45.0".toRequestBody("text/plain".toMediaType())
-                    val lon = "9.0".toRequestBody("text/plain".toMediaType())
-                    val desc = imageDescription.value.toRequestBody("text/plain".toMediaType())
-
-                    //carica l'immagine
-                    val imageResponse = api.caricaImage(imagePart, desc, lat, lon)
-
-                    if(imageResponse.isSuccessful){
-                        val imageId = imageResponse.body()!!.id
-
-                        //crea il post
-                        val postRequest = CreatePostRequest(
-                            title = title.value,
-                            description = postDescription.value,
-                            image = imageId,
-                            group = tripId
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Nuovo Post") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Chiudi"
                         )
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(modifier = Modifier.padding(paddingValues)) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    OutlinedTextField(
+                        value = title.value,
+                        onValueChange = { title.value = it },
+                        label = { Text("Titolo") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
 
-                        val postResponse = api.creaPost("Token ${AuthManager.token!!}", postRequest)
+                item {
+                    OutlinedTextField(
+                        value = postDescription.value,
+                        onValueChange = { postDescription.value = it },
+                        label = { Text("Descrizione") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 5
+                    )
+                }
 
-                        if(postResponse.isSuccessful){
-                            Toast.makeText(context, "Post creato!", Toast.LENGTH_SHORT).show()
-                            navController.popBackStack()
+                //preview dell'immagine e pulsante per scattare foto combinati
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                //richiedi permesso fotocamera quando l'utente clicca sul box
+                                cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if(imageUri.value != null){
+                            AsyncImage(
+                                model = imageUri.value,
+                                contentDescription = "Anteprima immagine",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                         else{
-                            Toast.makeText(context, "Errore creazione post", Toast.LENGTH_SHORT).show()
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Scatta foto",
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    "Tocca per scattare una foto",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
-                    else{
-                        Toast.makeText(context, "Errore caricamento immagine", Toast.LENGTH_SHORT).show()
+                }
+
+                //messaggio di errore
+                errorMessage?.let {
+                    item {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
-                catch(e: Exception){
-                    Toast.makeText(context, "Errore: ${e.message}", Toast.LENGTH_SHORT).show()
+
+                item {
+                    Button(
+                        onClick = {
+                            if (title.value.isBlank()) {
+                                errorMessage = "Inserisci un titolo"
+                                return@Button
+                            }
+
+                            if (imageUri.value == null) {
+                                errorMessage = "Scatta una foto"
+                                return@Button
+                            }
+
+                            isLoading = true
+                            errorMessage = null
+
+                            coroutineScope.launch {
+                                try {
+                                    val file = createPngFileFromUri(context, imageUri.value!!)
+                                        ?: throw Exception("Impossibile leggere il file immagine")
+
+                                    //analizza l'immagine con mlkit
+                                    val bitmap = BitmapFactory.decodeStream(
+                                        context.contentResolver.openInputStream(imageUri.value!!)
+                                    )
+
+                                    val analyzedText = analyzeImageWithMLKit(context, bitmap)
+                                    imageDescription.value = analyzedText
+
+                                    val reqFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+                                    val imagePart = MultipartBody.Part.createFormData("image", file.name, reqFile)
+
+                                    val lat = "45.0".toRequestBody("text/plain".toMediaType())
+                                    val lon = "9.0".toRequestBody("text/plain".toMediaType())
+                                    val desc = imageDescription.value.toRequestBody("text/plain".toMediaType())
+
+                                    //carica immagine
+                                    val imageResponse = api.caricaImage("Token ${AuthManager.token}",imagePart, desc, lat, lon)
+
+                                    if(imageResponse.isSuccessful){
+                                        val imageId = imageResponse.body()!!.id
+
+                                        //crea post
+                                        val postRequest = CreatePostRequest(
+                                            title = title.value,
+                                            description = postDescription.value,
+                                            image = imageId,
+                                            group = tripId
+                                        )
+
+                                        val postResponse = api.creaPost(
+                                            "Token ${AuthManager.token!!}",
+                                            postRequest
+                                        )
+
+                                        if(postResponse.isSuccessful){
+                                            Toast.makeText(
+                                                context,
+                                                "Post creato con successo!",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+
+                                            //torna alla paginaprecedente
+                                            navController.popBackStack()
+                                        }
+                                        else{
+                                            errorMessage = "Errore nella creazione del post"
+                                        }
+                                    }
+                                    else{
+                                        errorMessage = "Errore nel caricamento dell'immagine"
+                                    }
+                                }
+                                catch(e: Exception){
+                                    errorMessage = "Errore: ${e.localizedMessage}"
+                                }
+                                finally{
+                                    isLoading = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading
+                    ) {
+                        if(isLoading){
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                        else{
+                            Text("Pubblica Post")
+                        }
+                    }
                 }
             }
-        }) {
-            Text("Crea Post")
-        }
 
-        /*
-        TEMPORANEA ??
-        visualizzo il risultato di mlkit
-         */
-        if (imageDescription.value.isNotEmpty()) {
-            Text("Descrizione immagine analizzata: ${imageDescription.value}")
+            if(isLoading){
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
         }
     }
 }
@@ -461,15 +624,38 @@ fun PostItem(
     user: UserViewModel
 ) {
     var image by remember { mutableStateOf<Image?>(null) }
+    var author by remember { mutableStateOf<User?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    //carica l'immagine associata all'ID del post
-    LaunchedEffect(post.image?.id) {
-        post.image?.id?.let { imageId ->
-            val response = api.getImage("Token ${AuthManager.token}", imageId)
+    //carica immagine
+    LaunchedEffect(post.image) {
+        post.image.let { imageId ->
+            try {
+                val response = api.getImage("Token ${AuthManager.token}", imageId)
 
-            if(response.isSuccessful){
-                response.body()
+                if (response.isSuccessful) {
+                    image = response.body()
+                } else {
+                    errorMessage = "Errore nel caricamento dell'immagine (Codice ${response.code()})"
+                }
+            } catch (e: Exception) {
+                errorMessage = "Errore nel caricamento dell'immagine: ${e.localizedMessage}"
             }
+        }
+    }
+
+    //carica autore
+    LaunchedEffect(post.created_by) {
+        try {
+            val response = api.getUserById("Token ${AuthManager.token}", post.created_by)
+
+            if (response.isSuccessful) {
+                author = response.body()
+            } else {
+                errorMessage = "Errore nel recupero dell'autore (Codice ${response.code()})"
+            }
+        } catch (e: Exception) {
+            errorMessage = "Errore nel recupero dell'autore: ${e.localizedMessage}"
         }
     }
 
@@ -486,7 +672,6 @@ fun PostItem(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            //descrizione del post (se presente)
             post.description?.let {
                 Text(
                     text = it,
@@ -496,10 +681,9 @@ fun PostItem(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            //immagine del post (se presente e se recuperata)
             image?.let {
                 AsyncImage(
-                    model = Constants.BASE_URL + it.image,
+                    model = it.image,
                     contentDescription = it.description ?: "Immagine del post",
                     modifier = Modifier
                         .fillMaxWidth()
@@ -508,39 +692,58 @@ fun PostItem(
                         .padding(bottom = 8.dp),
                     contentScale = ContentScale.Crop
                 )
+
+                /*
+                it.description?.let { desc ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = desc,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                 */
             }
 
-            //informazioni sull'autore del post
-            post.createdBy?.let { user ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    //avatar dell'autore
-                    AsyncImage(
-                        model = Constants.BASE_URL + user.avatar,
-                        contentDescription = "Profilo di ${user.username}",
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
-                        contentScale = ContentScale.Crop,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    model = Constants.BASE_URL + author?.avatar,
+                    contentDescription = "Profilo di ${author?.username}",
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
 
-                    //username dell'autore
+                author?.username?.let {
                     Text(
-                        text = user.username,
+                        text = it,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
+            Spacer(modifier = Modifier.height(8.dp))
 
-            //data di creazione del post
             Text(
-                text = "Pubblicato il ${post.createdAt}",
+                text = "Pubblicato il ${post.created_at}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
+
+            //mostra messaggio di errore se presente
+            errorMessage?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }
