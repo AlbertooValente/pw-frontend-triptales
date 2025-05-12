@@ -287,7 +287,7 @@ fun EditProfile(
 
                                 val parts = mutableListOf<MultipartBody.Part>()
 
-                                if(username.isNotBlank() && email.isNotBlank() && password.isNotBlank() && bio.isNotBlank()){
+                                if(username.isNotBlank() && email.isNotBlank() && bio.isNotBlank()){
                                     if(username.isNotBlank()) parts.add(MultipartBody.Part.createFormData("username", username))
                                     if(email.isNotBlank()) parts.add(MultipartBody.Part.createFormData("email", email))
                                     if(password.isNotBlank()) parts.add(MultipartBody.Part.createFormData("password", password))
@@ -295,12 +295,14 @@ fun EditProfile(
 
                                     //aggiunge l'immagine se presente
                                     avatarUri?.let{ uri ->
-                                        val file = createPngFileFromUri(context = navController.context, uri = uri)
+                                        if (uri.scheme == "content") { //solo se è un'immagine selezionata dall'utente
+                                            val file = createPngFileFromUri(context = navController.context, uri = uri)
 
-                                        file?.let{
-                                            val requestImageFile = it.asRequestBody("image/*".toMediaTypeOrNull())
-                                            val avatarPart = MultipartBody.Part.createFormData("avatar", it.name, requestImageFile)
-                                            parts.add(avatarPart)
+                                            file?.let {
+                                                val requestImageFile = it.asRequestBody("image/*".toMediaTypeOrNull())
+                                                val avatarPart = MultipartBody.Part.createFormData("avatar", it.name, requestImageFile)
+                                                parts.add(avatarPart)
+                                            }
                                         }
                                     }
 

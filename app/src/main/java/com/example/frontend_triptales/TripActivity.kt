@@ -114,7 +114,7 @@ fun TripHome(
         floatingActionButton = {
             if (selectedTab == 0 && trip != null) {
                 FloatingActionButton(
-                    onClick = { navController.navigate("trip/${id}") },
+                    onClick = { navController.navigate("create_post/${id}") },
                     containerColor = MaterialTheme.colorScheme.primary
                 ) {
                     Icon(
