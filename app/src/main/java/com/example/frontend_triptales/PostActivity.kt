@@ -2,11 +2,13 @@ package com.example.frontend_triptales
 
 import android.graphics.BitmapFactory
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -24,13 +26,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Translate
@@ -38,13 +43,18 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +68,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -92,6 +104,7 @@ fun PostDetailPage(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var detectedText by remember { mutableStateOf<String?>(null) }
     var showTranslatedText by remember { mutableStateOf(false) }
+    val localContext = LocalContext.current
 
     //caricamento post, immagine e autore
     LaunchedEffect(postId) {
@@ -202,201 +215,497 @@ fun PostDetailPage(
             }
     ) { padding ->
         if (post != null) {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(padding)
-                    .padding(16.dp)
+            //per la gestione dei commenti
+            var comments by remember { mutableStateOf<List<Comment>>(emptyList()) }
+            var commentAuthorMap by remember { mutableStateOf<Map<Int, User>>(emptyMap()) }
+            var loadingComments by remember { mutableStateOf(true) }
+            var commentError by remember { mutableStateOf<String?>(null) }
+            var commentText by remember { mutableStateOf("") }
+            var submittingComment by remember { mutableStateOf(false) }
+
+            //caricamento dei commenti all'avvio
+            LaunchedEffect(postId) {
+                try {
+                    val response = api.getComments("Token ${AuthManager.token}", postId)
+
+                    if(response.isSuccessful){
+                        comments = response.body() ?: emptyList()
+
+                        //caricamento degli autori dei commenti
+                        val authorIds = comments.map { it.author }.distinct()
+                        val authors = mutableMapOf<Int, User>()
+
+                        authorIds.forEach { authorId ->
+                            try {
+                                val userResponse = api.getUserById("Token ${AuthManager.token}", authorId)
+
+                                if(userResponse.isSuccessful){
+                                    userResponse.body()?.let { user ->
+                                        authors[authorId] = user
+                                    }
+                                }
+                            }
+                            catch(e: Exception){
+                                //se trova un eccezione???
+                            }
+                        }
+
+                        commentAuthorMap = authors
+                    }
+                    else{
+                        commentError = "Impossibile caricare i commenti"
+                    }
+                }
+                catch(e: Exception){
+                    commentError = "Errore: ${e.message}"
+                }
+                finally{
+                    loadingComments = false
+                }
+            }
+
+            Box(
+                modifier = Modifier.fillMaxSize()
             ) {
-                //titolo e descrizione post
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = post!!.title,
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        handleToggleLike(
-                                            api = api,
-                                            postId = postId,
-                                            isLiked = isLiked,
-                                            onSuccess = {
-                                                isLiked = it
-                                                numLike += if (it) 1 else -1
-                                            },
-                                            onError = {
-                                                errorMessage = it
-                                            }
-                                        )
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                    contentDescription = if (isLiked) "Togli like" else "Metti like",
-                                    tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            Text(
-                                text = "$numLike",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    post!!.description?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-
-                //sezione immagine
-                if(image != null){
+                LazyColumn(
+                    modifier = Modifier
+                        .padding(padding)
+                        .padding(16.dp)
+                        .fillMaxSize()
+                        .padding(bottom = 70.dp)
+                ) {
+                    //titolo e descrizione post
                     item {
-                        //immagine
-                        AsyncImage(
-                            model = image!!.image,
-                            contentDescription = image!!.description ?: "Immagine del post",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                                .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.FillWidth
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        //descrizione immagine
-                        image!!.description?.let { desc ->
-                            Text(
-                                text = desc,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontStyle = FontStyle.Italic,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        //dettagli posizione
                         Row(
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-
                             Text(
-                                text = "Lat: ${image!!.latitude} - Long: ${image!!.longitude}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                text = post!!.title,
+                                style = MaterialTheme.typography.headlineMedium
                             )
-                        }
-                    }
 
-                    //sezione text detection
-                    item {
-                        if (detectedText != null) {
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Card(
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                                ),
-                                modifier = Modifier.fillMaxWidth()
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    TextButton(
-                                        onClick = { showTranslatedText = !showTranslatedText },
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                        colors = ButtonDefaults.textButtonColors(
-                                            contentColor = MaterialTheme.colorScheme.primary
-                                        )
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Translate,
-                                            contentDescription = null
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        Text(
-                                            text = if (showTranslatedText) "Nascondi testo rilevato" else "Mostra testo rilevato",
-                                            style = MaterialTheme.typography.labelLarge
-                                        )
+                                IconButton(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            handleToggleLike(
+                                                api = api,
+                                                postId = postId,
+                                                isLiked = isLiked,
+                                                onSuccess = {
+                                                    isLiked = it
+                                                    numLike += if (it) 1 else -1
+                                                },
+                                                onError = {
+                                                    errorMessage = it
+                                                }
+                                            )
+                                        }
                                     }
-
-                                    AnimatedVisibility(
-                                        visible = showTranslatedText,
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        Text(
-                                            text = detectedText ?: "",
-                                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
-                                            modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                                        )
-                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                        contentDescription = if (isLiked) "Togli like" else "Metti like",
+                                        tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.End
-                    ) {
-                        //informazioni autore
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            AsyncImage(
-                                model = Constants.BASE_URL + author?.avatar,
-                                contentDescription = "Profilo di ${author?.username}",
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .border(1.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            author?.username?.let {
                                 Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    text = "$numLike",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        //data pubblicazione post
+                        post!!.description?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
+
+                    //sezione immagine
+                    if(image != null){
+                        item {
+                            //immagine
+                            AsyncImage(
+                                model = image!!.image,
+                                contentDescription = image!!.description ?: "Immagine del post",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.FillWidth
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            //descrizione immagine
+                            image!!.description?.let { desc ->
+                                Text(
+                                    text = desc,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontStyle = FontStyle.Italic,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            //dettagli posizione
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                Text(
+                                    text = "Lat: ${image!!.latitude} - Long: ${image!!.longitude}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+
+                        //sezione text detection
+                        item {
+                            if(detectedText != null){
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Card(
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(
+                                            alpha = 0.5f
+                                        )
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        TextButton(
+                                            onClick = { showTranslatedText = !showTranslatedText },
+                                            contentPadding = PaddingValues(
+                                                horizontal = 8.dp,
+                                                vertical = 4.dp
+                                            ),
+                                            colors = ButtonDefaults.textButtonColors(
+                                                contentColor = MaterialTheme.colorScheme.primary
+                                            )
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Translate,
+                                                contentDescription = null
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                            Text(
+                                                text = if (showTranslatedText) "Nascondi testo rilevato" else "Mostra testo rilevato",
+                                                style = MaterialTheme.typography.labelLarge
+                                            )
+                                        }
+
+                                        AnimatedVisibility(
+                                            visible = showTranslatedText,
+                                            enter = expandVertically() + fadeIn(),
+                                            exit = shrinkVertically() + fadeOut()
+                                        ) {
+                                            Text(
+                                                text = detectedText ?: "",
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontStyle = FontStyle.Italic
+                                                ),
+                                                modifier = Modifier.padding(
+                                                    top = 8.dp,
+                                                    start = 8.dp,
+                                                    end = 8.dp
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            //informazioni autore
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                AsyncImage(
+                                    model = Constants.BASE_URL + author?.avatar,
+                                    contentDescription = "Profilo di ${author?.username}",
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.onPrimary,
+                                            CircleShape
+                                        ),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                author?.username?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            //data pubblicazione post
+                            Text(
+                                text = "Pubblicato il ${formatDate(post!!.created_at)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
+                    //separatore per la sezione commenti
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(16.dp))
+
                         Text(
-                            text = "Pubblicato il ${formatDate(post!!.created_at)}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            text = "Commenti",
+                            style = MaterialTheme.typography.titleLarge
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    //stato di caricamento commenti
+                    if (loadingComments) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+                    }
+                    else if (commentError != null) {    //messaggi di errore
+                        item {
+                            Text(
+                                text = commentError!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(vertical = 16.dp)
+                            )
+                        }
+                    }
+                    else if (comments.isEmpty()) {  //nessun commento
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Non ci sono ancora commenti. Sii il primo a commentare!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+
+                    //lista commenti
+                    items(comments) { comment ->
+                        val commentAuthor = commentAuthorMap[comment.author]
+
+                        Card(
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                //intestazione commento con avatar e nome utente
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    AsyncImage(
+                                        model = Constants.BASE_URL + commentAuthor?.avatar,
+                                        contentDescription = "Avatar di ${commentAuthor?.username}",
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .border(
+                                                1.dp,
+                                                MaterialTheme.colorScheme.onPrimary,
+                                                CircleShape
+                                            ),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    Text(
+                                        text = commentAuthor?.username ?: "Utente sconosciuto",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+
+                                    Text(
+                                        text = formatDate(comment.created_at),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                //testo del commento
+                                Text(
+                                    text = comment.text,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+
+                    //spazio extra in fondo per evitare che l'ultimo commento sia nascosto dall'input
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+
+                //input per inserire nuovi commenti
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = commentText,
+                            onValueChange = { commentText = it },
+                            placeholder = { Text("Scrivi un commento...") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp),
+                            singleLine = true,
+                            shape = RoundedCornerShape(24.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            )
+                        )
+
+                        IconButton(
+                            onClick = {
+                                if (commentText.isNotBlank() && !submittingComment) {
+                                    submittingComment = true
+                                    coroutineScope.launch {
+                                        try {
+                                            val request = CreateCommentRequest(commentText.trim())
+                                            val response = api.createComment("Token ${AuthManager.token}", postId, request)
+
+                                            if(response.isSuccessful){
+                                                val newComment = response.body()
+
+                                                newComment?.let {
+                                                    //aggiunge il nuovo commento all'elenco
+                                                    comments = comments + it
+
+                                                    //aggiunge l'autore alla mappa se non presente
+                                                    if (!commentAuthorMap.containsKey(it.author)) {
+                                                        val currentUser = user.user
+
+                                                        currentUser?.let { user ->
+                                                            commentAuthorMap = commentAuthorMap + (it.author to user)
+                                                        }
+                                                    }
+
+                                                    commentText = ""
+                                                }
+                                            }
+                                            else{
+                                                throw Exception("Errore durante l'invio del commento")
+                                            }
+                                        }
+                                        catch(e: Exception){
+                                            Toast.makeText(
+                                                localContext,
+                                                "Impossibile inviare il commento: ${e.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        finally{
+                                            submittingComment = false
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = commentText.isNotBlank() && !submittingComment,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(
+                                    color = if (commentText.isNotBlank() && !submittingComment)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            if(submittingComment){
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                            else{
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Invia commento",
+                                    tint = if (commentText.isNotBlank())
+                                        MaterialTheme.colorScheme.onPrimary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
+                            }
+                        }
                     }
                 }
             }
