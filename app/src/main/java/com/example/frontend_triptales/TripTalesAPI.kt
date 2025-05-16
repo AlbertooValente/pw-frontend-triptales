@@ -7,11 +7,6 @@ import retrofit2.http.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-//salvo l'ip del server come variabile globale
-object Constants {
-    const val BASE_URL = "http://192.168.95.5:8000"  //da sostituire ogni volta con l'ip del backend
-}
-
 //data class per le richieste
 data class LoginRequest(
     val username: String,
@@ -32,6 +27,18 @@ data class CreatePostRequest(
 
 data class CreateCommentRequest(
     val text: String
+)
+
+data class UserLikes(
+    val user_id: Int,
+    val username: String,
+    val total_likes: Int
+)
+
+data class UserPosts(
+    val user_id: Int,
+    val username: String,
+    val total_posts: Int
 )
 
 data class TokenResponse(val token: String)
@@ -98,9 +105,24 @@ interface TripTalesApi {
         @Header("Authorization") token: String,
         @Path("id") tripId: Int
     ): Response<List<Post>>
-    /*
-    classifiche
-     */
+
+    @GET("trips/{id}/top-like/")
+    suspend fun getTopLike(
+        @Header("Authorization") token: String,
+        @Path("id") tripId: Int
+    ): Response<List<Post>>
+
+    @GET("trips/{id}/top-like-user")
+    suspend fun getTopLikeUser(
+        @Header("Authorization") token: String,
+        @Path("id") tripId: Int
+    ): Response<List<UserLikes>>
+
+    @GET("trips/{id}/top-posters")
+    suspend fun getTopPosters(
+        @Header("Authorization") token: String,
+        @Path("id") tripId: Int
+    ): Response<List<UserPosts>>
 
 
     //IMAGES
@@ -171,6 +193,11 @@ interface TripTalesApi {
         @Path("id") postId: Int,
         @Path("idComm") commentId: Int
     )
+}
+
+//salvo l'ip del server come variabile globale
+object Constants {
+    const val BASE_URL = "http://192.168.95.5:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {

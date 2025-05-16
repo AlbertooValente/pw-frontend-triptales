@@ -1,6 +1,9 @@
 package com.example.frontend_triptales
 
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,18 +20,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,11 +49,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun TripHome(
@@ -127,7 +139,7 @@ fun TripHome(
                             Text("Mappa (...)", modifier = Modifier.padding(24.dp))
                         }
                         2 -> {
-                            Text("Classifica (...)", modifier = Modifier.padding(24.dp))
+                            Classifiche(trip, api, coroutineScope)
                         }
                     }
                 }
@@ -290,5 +302,221 @@ fun Bacheca(
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(16.dp)
         )
+    }
+}
+
+@Composable
+fun Mappa(){}
+
+@Composable
+fun Classifiche(
+    trip: Trip?,
+    api: TripTalesApi,
+    coroutineScope: CoroutineScope
+){
+    //gestione dropdown menu
+    var selectedClassifica by remember { mutableStateOf("Post più apprezzati") }
+    var isDropdownExpanded by remember { mutableStateOf(false) }
+
+    val classificheOptions = listOf(
+        "Post più apprezzati",
+        "Utenti con più like",
+        "Utenti con più post"
+    )
+
+    //dati delle varie classifiche
+    var topLikePosts by remember { mutableStateOf<List<Post>>(emptyList()) }
+    var topLikeUsers by remember { mutableStateOf<List<UserLikes>>(emptyList()) }
+    var topPosters by remember { mutableStateOf<List<UserPosts>>(emptyList()) }
+
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val localContext = LocalContext.current
+
+    //funzione per caricare i dati della classifica selezionata
+    fun loadClassificaData() {
+        if (trip == null) return
+
+        coroutineScope.launch {
+            isLoading = true
+            errorMessage = null
+
+            try {
+                val token = "Token ${AuthManager.token}"
+
+                when (selectedClassifica) {
+                    "Post più apprezzati" -> {
+                        val response = api.getTopLike(token, trip.id)
+
+                        if(response.isSuccessful){
+                            topLikePosts = response.body() ?: emptyList()
+                        }
+                        else{
+                            errorMessage = "Impossibile caricare i post più apprezzati"
+                        }
+                    }
+                    "Utenti con più like" -> {
+                        val response = api.getTopLikeUser(token, trip.id)
+
+                        if(response.isSuccessful){
+                            topLikeUsers = response.body() ?: emptyList()
+                        }
+                        else{
+                            errorMessage = "Impossibile caricare gli utenti con più like"
+                        }
+                    }
+                    "Utenti con più post" -> {
+                        val response = api.getTopPosters(token, trip.id)
+
+                        if(response.isSuccessful){
+                            topPosters = response.body() ?: emptyList()
+                        }
+                        else{
+                            errorMessage = "Impossibile caricare gli utenti con più post"
+                        }
+                    }
+                }
+            }
+            catch(e: Exception){
+                errorMessage = "Errore: ${e.message}"
+                Toast.makeText(
+                    localContext,
+                    "Errore nel caricamento: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            finally{
+                isLoading = false
+            }
+        }
+    }
+
+    //carica i dati quando cambia la selezione
+    LaunchedEffect(selectedClassifica, trip) {
+        if (trip != null) {
+            loadClassificaData()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Classifiche del viaggio",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        //dropdown per selezione classifica
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp)
+        ) {
+            OutlinedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isDropdownExpanded = true },
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = selectedClassifica,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Icon(
+                        imageVector = if (isDropdownExpanded)
+                            Icons.Default.KeyboardArrowUp
+                        else
+                            Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Espandi menu"
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = isDropdownExpanded,
+                onDismissRequest = { isDropdownExpanded = false },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                classificheOptions.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(text = option) },
+                        onClick = {
+                            selectedClassifica = option
+                            isDropdownExpanded = false
+                        },
+                        trailingIcon = {
+                            if(selectedClassifica == option){
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Selezionato",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
+        when {
+            isLoading -> {
+                BoxWithLoader()
+            }
+
+            errorMessage != null -> {
+                ErrorMessage(errorMessage!!)
+            }
+
+            else -> {
+                when (selectedClassifica) {
+                    "Post più apprezzati" -> RankingList(
+                        items = topLikePosts,
+                        emptyMessage = "Nessun post disponibile per questa classifica",
+                        itemContent = { index, item -> PostRankingItem(item, index + 1) }
+                    )
+
+                    "Utenti con più like" -> RankingList(
+                        items = topLikeUsers,
+                        emptyMessage = "Nessun utente disponibile per questa classifica",
+                        itemContent = { index, item ->
+                            UserRankingItem(
+                                username = item.username,
+                                value = item.total_likes,
+                                position = index + 1,
+                                valueLabel = "like"
+                            )
+                        }
+                    )
+
+                    "Utenti con più post" -> RankingList(
+                        items = topPosters,
+                        emptyMessage = "Nessun utente disponibile per questa classifica",
+                        itemContent = { index, item ->
+                            UserRankingItem(
+                                username = item.username,
+                                value = item.total_posts,
+                                position = index + 1,
+                                valueLabel = "post"
+                            )
+                        }
+                    )
+                }
+            }
+        }
     }
 }
