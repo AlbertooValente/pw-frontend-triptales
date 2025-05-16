@@ -150,7 +150,7 @@ fun AppNav(){
         composable("postDetailPage/{postId}"){backStackEntry ->
             val postId = backStackEntry.arguments?.getString("postId")?.toIntOrNull()
 
-            PostDetailPage(api, postId!!, navController)
+            PostDetailPage(api, postId!!, navController, coroutineScope, user)
         }
     }
 }

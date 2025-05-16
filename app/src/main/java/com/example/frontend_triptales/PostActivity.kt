@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,8 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -52,6 +55,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,7 +69,9 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URL
 
@@ -73,11 +80,15 @@ import java.net.URL
 fun PostDetailPage(
     api: TripTalesApi,
     postId: Int,
-    navController: NavController
+    navController: NavController,
+    coroutineScope: CoroutineScope,
+    user: UserViewModel
 ){
     var post by remember { mutableStateOf<Post?>(null) }
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
+    var isLiked by remember { mutableStateOf(post?.likes?.contains(user.user!!.id) == true) }
+    var numLike by remember { mutableStateOf(post?.likes_count ?: 0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var detectedText by remember { mutableStateOf<String?>(null) }
     var showTranslatedText by remember { mutableStateOf(false) }
@@ -167,7 +178,28 @@ fun PostDetailPage(
                     }
                 }
             )
-        }
+        },
+        modifier = Modifier
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        coroutineScope.launch {
+                            handleToggleLike(
+                                api = api,
+                                postId = postId,
+                                isLiked = isLiked,
+                                onSuccess = {
+                                    isLiked = it
+                                    numLike += if (it) 1 else -1
+                                },
+                                onError = {
+                                    errorMessage = it
+                                }
+                            )
+                        }
+                    }
+                )
+            }
     ) { padding ->
         if (post != null) {
             LazyColumn(
@@ -177,10 +209,49 @@ fun PostDetailPage(
             ) {
                 //titolo e descrizione post
                 item {
-                    Text(
-                        text = post!!.title,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = post!!.title,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        handleToggleLike(
+                                            api = api,
+                                            postId = postId,
+                                            isLiked = isLiked,
+                                            onSuccess = {
+                                                isLiked = it
+                                                numLike += if (it) 1 else -1
+                                            },
+                                            onError = {
+                                                errorMessage = it
+                                            }
+                                        )
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                    contentDescription = if (isLiked) "Togli like" else "Metti like",
+                                    tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Text(
+                                text = "$numLike",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
 
                     post!!.description?.let {

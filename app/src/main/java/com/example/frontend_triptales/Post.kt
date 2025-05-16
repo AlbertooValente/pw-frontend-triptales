@@ -7,6 +7,7 @@ data class Post(
     val created_at: String,
     val created_by: Int,
     val image: Int,
-    val likes: List<Int>,
-    val group: Int
+    val group: Int,
+    val likes_count: Int,
+    val likes: List<Int>?
 )

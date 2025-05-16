@@ -9,20 +9,34 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 //salvo l'ip del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.1.8:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "http://192.168.95.5:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 //data class per le richieste
-data class LoginRequest(val username: String, val password: String)
-data class TokenResponse(val token: String)
-data class MessageResponse(val message: String)
-data class CreateTripRequest(val name: String, val description: String)
+data class LoginRequest(
+    val username: String,
+    val password: String
+)
+
+data class CreateTripRequest(
+    val name: String,
+    val description: String
+)
+
 data class CreatePostRequest(
     val title: String,
     val description: String,
     val group: Int,
     val image: Int
 )
+
+data class CreateCommentRequest(
+    val text: String
+)
+
+data class TokenResponse(val token: String)
+data class MessageResponse(val message: String)
+data class StatusResponse(val response: String)
 
 
 interface TripTalesApi {
@@ -119,6 +133,44 @@ interface TripTalesApi {
         @Header("Authorization") token: String,
         @Path("id") postId: Int
     ): Response<Post>
+    /*
+    Modifica ed elimina post
+    */
+
+    @POST("posts/{id}/like/")
+    suspend fun giveLike(
+        @Header("Authorization") token: String,
+        @Path("id") postId: Int
+    ): Response<StatusResponse>
+
+    @POST("posts/{id}/unlike/")
+    suspend fun giveUnlike(
+        @Header("Authorization") token: String,
+        @Path("id") postId: Int
+    ): Response<StatusResponse>
+
+    @GET("posts/{id}/comments/")
+    suspend fun getComments(
+        @Header("Authorization") token: String,
+        @Path("id") postId: Int
+    ): Response<List<Comment>>
+
+    @POST("posts/{id}/comments")
+    suspend fun createComment(
+        @Header("Authorization") token: String,
+        @Path("id") postId: Int,
+        @Body request: CreateCommentRequest
+    ): Response<Comment>
+    /*
+    Get comment singolo lo faccio?
+     */
+
+    @DELETE("posts/{id}/comments/{idComm}")
+    suspend fun deleteComment(
+        @Header("Authorization") token: String,
+        @Path("id") postId: Int,
+        @Path("idComm") commentId: Int
+    )
 }
 
 object RetrofitInstance {

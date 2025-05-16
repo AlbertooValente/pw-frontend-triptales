@@ -86,6 +86,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import kotlin.coroutines.resumeWithException
 import android.Manifest
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.input.pointer.pointerInput
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -165,7 +171,7 @@ fun TripHome(
                 trip != null -> {
                     when (selectedTab) {
                         0 -> {
-                            Bacheca(trip, api, navController)
+                            Bacheca(trip, api, navController, user, coroutineScope)
                         }
                         1 -> {
                             Text("Mappa (...)", modifier = Modifier.padding(24.dp))
@@ -195,7 +201,9 @@ fun TripHome(
 fun Bacheca(
     trip: Trip?,
     api: TripTalesApi,
-    navController: NavController
+    navController: NavController,
+    user: UserViewModel,
+    coroutineScope: CoroutineScope
 ) {
     var showDialog by remember { mutableStateOf(false) }
     var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
@@ -256,10 +264,9 @@ fun Bacheca(
                             )
                         }
                     }
-
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Optional: Add a subtle description or additional info
+                    //opzionale descrizione
                     trip?.description?.takeIf { it.isNotBlank() }?.let {
                         Text(
                             text = it,
@@ -279,7 +286,7 @@ fun Bacheca(
 
         //sezione dei post
         items(posts) { post ->
-            PostItem(api, post, navController)
+            PostItem(api, post, navController, user, coroutineScope)
         }
 
         //se non ci sono post
@@ -692,11 +699,15 @@ suspend fun getCurrentLocation(context: Context): Location? {
 fun PostItem(
     api: TripTalesApi,
     post: Post,
-    navController: NavController
+    navController: NavController,
+    user: UserViewModel,
+    coroutineScope: CoroutineScope
 ) {
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLiked by remember { mutableStateOf(post.likes?.contains(user.user!!.id) == true) }
+    var numLike by remember { mutableStateOf(post.likes_count) }
 
     //carica immagine
     LaunchedEffect(post.image) {
@@ -707,7 +718,7 @@ fun PostItem(
                 if(response.isSuccessful){
                     image = response.body()
                 }
-                else {
+                else{
                     errorMessage = "Errore nel caricamento dell'immagine (Codice ${response.code()})"
                 }
             }
@@ -739,16 +750,75 @@ fun PostItem(
         elevation = CardDefaults.cardElevation(4.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                navController.navigate("postDetailPage/${post.id}")
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        coroutineScope.launch {
+                            handleToggleLike(
+                                api = api,
+                                postId = post.id,
+                                isLiked = isLiked,
+                                onSuccess = {
+                                    isLiked = it
+                                    numLike += if (it) 1 else -1
+                                },
+                                onError = {
+                                    errorMessage = it
+                                }
+                            )
+                        }
+                    },
+                    onTap = {
+                        navController.navigate("postDetailPage/${post.id}")
+                    }
+                )
             }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = post.title,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = post.title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                handleToggleLike(
+                                    api = api,
+                                    postId = post.id,
+                                    isLiked = isLiked,
+                                    onSuccess = {
+                                        isLiked = it
+                                        numLike += if (it) 1 else -1
+                                    },
+                                    onError = {
+                                        errorMessage = it
+                                    }
+                                )
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = if (isLiked) "Togli like" else "Metti like",
+                            tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "$numLike",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
 
             image?.let {
@@ -791,6 +861,7 @@ fun PostItem(
                         contentScale = ContentScale.Crop
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+
                     author?.username?.let {
                         Text(
                             text = it,
@@ -821,6 +892,35 @@ fun PostItem(
         }
     }
 }
+
+//funzione per la gestione dei like
+suspend fun handleToggleLike(
+    api: TripTalesApi,
+    postId: Int,
+    isLiked: Boolean,
+    onSuccess: (newIsLiked: Boolean) -> Unit,
+    onError: (String) -> Unit
+) {
+    try{
+        val response = if(isLiked){
+            api.giveUnlike("Token ${AuthManager.token}", postId)
+        }
+        else{
+            api.giveLike("Token ${AuthManager.token}", postId)
+        }
+
+        if(response.isSuccessful){
+            onSuccess(!isLiked)
+        }
+        else{
+            onError("Errore like: codice ${response.code()}")
+        }
+    }
+    catch(e: Exception){
+        onError("Errore like: ${e.localizedMessage}")
+    }
+}
+
 
 //funzione che modifica il formato della data
 fun formatDate(sqlDate: String): String {
