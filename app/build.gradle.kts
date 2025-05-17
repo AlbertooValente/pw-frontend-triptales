@@ -46,6 +46,8 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.5")
     implementation("io.coil-kt:coil-compose:2.4.0")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.google.maps.android:maps-compose:4.1.1")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 
     //text recognition
     implementation ("com.google.mlkit:text-recognition:16.0.1")

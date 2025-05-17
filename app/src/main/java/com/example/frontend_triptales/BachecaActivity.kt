@@ -572,8 +572,8 @@ fun PostItem(
                         .padding(bottom = 8.dp),
                     contentScale = ContentScale.Crop
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
                     text = "Lat: " + it.latitude + " Long: " + it.longitude,
                     style = MaterialTheme.typography.bodySmall,

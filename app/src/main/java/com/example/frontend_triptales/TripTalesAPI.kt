@@ -112,13 +112,13 @@ interface TripTalesApi {
         @Path("id") tripId: Int
     ): Response<List<Post>>
 
-    @GET("trips/{id}/top-like-user")
+    @GET("trips/{id}/top-like-user/")
     suspend fun getTopLikeUser(
         @Header("Authorization") token: String,
         @Path("id") tripId: Int
     ): Response<List<UserLikes>>
 
-    @GET("trips/{id}/top-posters")
+    @GET("trips/{id}/top-posters/")
     suspend fun getTopPosters(
         @Header("Authorization") token: String,
         @Path("id") tripId: Int
@@ -177,7 +177,7 @@ interface TripTalesApi {
         @Path("id") postId: Int
     ): Response<List<Comment>>
 
-    @POST("posts/{id}/comments")
+    @POST("posts/{id}/comments/")
     suspend fun createComment(
         @Header("Authorization") token: String,
         @Path("id") postId: Int,
@@ -197,7 +197,7 @@ interface TripTalesApi {
 
 //salvo l'ip del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.95.5:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "http://192.168.106.5:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {

@@ -1,5 +1,9 @@
 package com.example.frontend_triptales
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import android.util.Base64
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -43,8 +47,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,8 +61,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import androidx.core.graphics.scale
+import coil.ImageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import com.google.android.gms.maps.CameraUpdateFactory
 
 @Composable
 fun TripHome(
@@ -69,6 +88,7 @@ fun TripHome(
     var trip by remember { mutableStateOf<Trip?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableStateOf(0) } // 0 = bacheca, 1 = mappa, 2 = classifica
+    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
 
     LaunchedEffect(id) {
         try {
@@ -86,9 +106,20 @@ fun TripHome(
         }
     }
 
+    //carica post
+    LaunchedEffect(trip?.id) {
+        if(trip != null){
+            val response = api.getPosts("Token ${AuthManager.token}", trip!!.id)
+
+            if(response.isSuccessful){
+                posts = response.body() ?: emptyList()
+            }
+        }
+    }
+
     Scaffold(
         floatingActionButton = {
-            if (selectedTab == 0 && trip != null) {
+            if(selectedTab == 0 && trip != null){
                 FloatingActionButton(
                     onClick = { navController.navigate("create_post/${id}") },
                     containerColor = MaterialTheme.colorScheme.primary
@@ -133,10 +164,16 @@ fun TripHome(
                 trip != null -> {
                     when (selectedTab) {
                         0 -> {
-                            Bacheca(trip, api, navController, user, coroutineScope)
+                            Bacheca(trip, posts, api, navController, user, coroutineScope)
                         }
                         1 -> {
-                            Text("Mappa (...)", modifier = Modifier.padding(24.dp))
+                            var postWithImages by remember { mutableStateOf<List<PostWithImage>>(emptyList()) }
+
+                            LaunchedEffect(Unit) {
+                                postWithImages = loadPostWithImages(api, posts)
+                            }
+
+                            Mappa(postWithImages, navController)
                         }
                         2 -> {
                             Classifiche(trip, api, coroutineScope)
@@ -159,26 +196,17 @@ fun TripHome(
     }
 }
 
+//gestione bacheca
 @Composable
 fun Bacheca(
     trip: Trip?,
+    posts: List<Post>,
     api: TripTalesApi,
     navController: NavController,
     user: UserViewModel,
     coroutineScope: CoroutineScope
 ) {
     var showDialog by remember { mutableStateOf(false) }
-    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
-
-    LaunchedEffect(trip?.id) {
-        if (trip != null) {
-            val response = api.getPosts("Token ${AuthManager.token}", trip.id)
-
-            if (response.isSuccessful) {
-                posts = response.body() ?: emptyList()
-            }
-        }
-    }
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -305,9 +333,106 @@ fun Bacheca(
     }
 }
 
-@Composable
-fun Mappa(){}
 
+//gestione mappa
+data class PostWithImage(
+    val post: Post,
+    val image: Image
+)
+
+suspend fun loadPostWithImages(api: TripTalesApi, posts: List<Post>): List<PostWithImage> {
+    return posts.mapNotNull { post ->
+        try{
+            val response = api.getImage("Token ${AuthManager.token}", post.image)
+
+            if(response.isSuccessful && response.body() != null){
+                PostWithImage(post, response.body()!!)
+            }
+            else null
+        }
+        catch(e: Exception){
+            null
+        }
+    }
+}
+
+@Composable
+fun Mappa(
+    postWithImages: List<PostWithImage>,
+    navController: NavController
+) {
+    val cameraPositionState = rememberCameraPositionState()
+
+    LaunchedEffect(postWithImages){
+        val first = postWithImages.firstOrNull()?.image
+
+        if(first != null){
+            cameraPositionState.animate(
+                update = CameraUpdateFactory.newLatLngZoom(
+                    LatLng(first.latitude, first.longitude),
+                    6f
+                )
+            )
+        }
+    }
+
+    GoogleMap(
+        modifier = Modifier.fillMaxSize(),
+        cameraPositionState = cameraPositionState
+    ) {
+        postWithImages.forEach { item ->
+            val lat = item.image.latitude
+            val lon = item.image.longitude
+            val descriptor by rememberBitmapDescriptorFromUrl(item.image.image)
+
+            if(descriptor != null){
+                Marker(
+                    state = MarkerState(position = LatLng(lat, lon)),
+                    title = item.post.title,
+                    snippet = "Tap per dettagli",
+                    onClick = {
+                        navController.navigate("postDetailPage/${item.post.id}")
+                        true
+                    },
+                    icon = descriptor
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun rememberBitmapDescriptorFromUrl(fullUrl: String): State<BitmapDescriptor?> {
+    val context = LocalContext.current
+
+    return produceState<BitmapDescriptor?>(initialValue = null, key1 = fullUrl) {
+        try {
+            val loader = ImageLoader(context)
+            val request = ImageRequest.Builder(context)
+                .data(fullUrl)
+                .allowHardware(false) // serve per bitmap conversion
+                .build()
+
+            val result = (loader.execute(request) as? SuccessResult)?.drawable
+            val bitmap = (result as? BitmapDrawable)?.bitmap
+
+            if(bitmap != null){
+                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 100, 100, false)
+                value = BitmapDescriptorFactory.fromBitmap(scaledBitmap)
+            }
+            else{
+                value = null
+            }
+        }
+        catch(_: Exception){
+            value = null
+        }
+    }
+}
+
+
+
+//gestione classifiche
 @Composable
 fun Classifiche(
     trip: Trip?,
@@ -315,11 +440,11 @@ fun Classifiche(
     coroutineScope: CoroutineScope
 ){
     //gestione dropdown menu
-    var selectedClassifica by remember { mutableStateOf("Post più apprezzati") }
+    var selectedClassifica by remember { mutableStateOf("Post con più like") }
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
     val classificheOptions = listOf(
-        "Post più apprezzati",
+        "Post con più like",
         "Utenti con più like",
         "Utenti con più post"
     )
@@ -345,7 +470,7 @@ fun Classifiche(
                 val token = "Token ${AuthManager.token}"
 
                 when (selectedClassifica) {
-                    "Post più apprezzati" -> {
+                    "Post con più like" -> {
                         val response = api.getTopLike(token, trip.id)
 
                         if(response.isSuccessful){
@@ -484,7 +609,7 @@ fun Classifiche(
 
             else -> {
                 when (selectedClassifica) {
-                    "Post più apprezzati" -> RankingList(
+                    "Post con più like" -> RankingList(
                         items = topLikePosts,
                         emptyMessage = "Nessun post disponibile per questa classifica",
                         itemContent = { index, item -> PostRankingItem(item, index + 1) }

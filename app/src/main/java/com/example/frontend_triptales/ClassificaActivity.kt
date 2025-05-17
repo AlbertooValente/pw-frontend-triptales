@@ -82,6 +82,7 @@ fun <T> RankingList(
         itemsIndexed(items) { index, item ->
             itemContent(index, item)
 
+            /*
             if(index < items.size - 1){
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 8.dp),
@@ -89,6 +90,7 @@ fun <T> RankingList(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
                 )
             }
+             */
         }
     }
 }
