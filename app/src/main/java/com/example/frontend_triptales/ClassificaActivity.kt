@@ -81,16 +81,6 @@ fun <T> RankingList(
     LazyColumn {
         itemsIndexed(items) { index, item ->
             itemContent(index, item)
-
-            /*
-            if(index < items.size - 1){
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
-                )
-            }
-             */
         }
     }
 }
@@ -126,6 +116,7 @@ fun RankingItemCard(
 
             //contenuto personalizzato
             content()
+            Spacer(modifier = Modifier.weight(1f))
 
             //indicatore di valore personalizzato
             value()

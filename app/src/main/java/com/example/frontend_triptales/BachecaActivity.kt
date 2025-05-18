@@ -448,6 +448,7 @@ fun PostItem(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLiked by remember { mutableStateOf(post.likes?.contains(user.user!!.id) == true) }
     var numLike by remember { mutableStateOf(post.likes_count) }
+    val isAuthor = user.user!!.id == post.created_by
 
     //carica immagine
     LaunchedEffect(post.image) {
@@ -493,19 +494,21 @@ fun PostItem(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
-                        coroutineScope.launch {
-                            handleToggleLike(
-                                api = api,
-                                postId = post.id,
-                                isLiked = isLiked,
-                                onSuccess = {
-                                    isLiked = it
-                                    numLike += if (it) 1 else -1
-                                },
-                                onError = {
-                                    errorMessage = it
-                                }
-                            )
+                        if(!isAuthor){
+                            coroutineScope.launch {
+                                handleToggleLike(
+                                    api = api,
+                                    postId = post.id,
+                                    isLiked = isLiked,
+                                    onSuccess = {
+                                        isLiked = it
+                                        numLike += if (it) 1 else -1
+                                    },
+                                    onError = {
+                                        errorMessage = it
+                                    }
+                                )
+                            }
                         }
                     },
                     onTap = {
@@ -544,14 +547,20 @@ fun PostItem(
                                     }
                                 )
                             }
-                        }
+                        },
+                        enabled = !isAuthor     //disabilita il like per l'autore
                     ) {
                         Icon(
-                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            imageVector = if (isLiked || isAuthor) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                             contentDescription = if (isLiked) "Togli like" else "Metti like",
-                            tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface
+                            tint = if (isLiked) Color.Red
+                            else if (isAuthor)
+                                Color.Gray
+                            else
+                                MaterialTheme.colorScheme.onSurface
                         )
                     }
+
                     Text(
                         text = "$numLike",
                         style = MaterialTheme.typography.bodySmall,
@@ -571,13 +580,6 @@ fun PostItem(
                         .clip(RoundedCornerShape(8.dp))
                         .padding(bottom = 8.dp),
                     contentScale = ContentScale.Crop
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Lat: " + it.latitude + " Long: " + it.longitude,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }

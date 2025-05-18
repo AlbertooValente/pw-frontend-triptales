@@ -339,7 +339,7 @@ fun PostDetailPage(
                                 contentDescription = image!!.description ?: "Immagine del post",
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(300.dp)
+                                    //.height(300.dp)
                                     .clip(RoundedCornerShape(12.dp)),
                                 contentScale = ContentScale.FillWidth
                             )

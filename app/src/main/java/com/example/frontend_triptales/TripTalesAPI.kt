@@ -197,7 +197,7 @@ interface TripTalesApi {
 
 //salvo l'ip del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.106.5:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "http://192.168.1.10:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {

@@ -2,6 +2,11 @@ package com.example.frontend_triptales
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.BitmapShader
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
 import android.widget.Toast
@@ -76,6 +81,7 @@ import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.google.android.gms.maps.CameraUpdateFactory
+import androidx.core.graphics.createBitmap
 
 @Composable
 fun TripHome(
@@ -299,7 +305,7 @@ fun Bacheca(
     }
 
     //dialog con le info del trip
-    if (showDialog && trip != null) {
+    if(showDialog && trip != null){
         AlertDialog(
             onDismissRequest = { showDialog = false },
             confirmButton = {
@@ -410,15 +416,69 @@ fun rememberBitmapDescriptorFromUrl(fullUrl: String): State<BitmapDescriptor?> {
             val loader = ImageLoader(context)
             val request = ImageRequest.Builder(context)
                 .data(fullUrl)
-                .allowHardware(false) // serve per bitmap conversion
+                .allowHardware(false)
                 .build()
 
             val result = (loader.execute(request) as? SuccessResult)?.drawable
             val bitmap = (result as? BitmapDrawable)?.bitmap
 
             if(bitmap != null){
-                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 100, 100, false)
-                value = BitmapDescriptorFactory.fromBitmap(scaledBitmap)
+                val size = 120
+                val radius = size / 2f
+                val padding = 6f // spazio per il bordo
+
+                //crea una bitmap per l'immagine circolare
+                val circularBitmap = createBitmap(size, size)
+                val canvas = Canvas(circularBitmap)
+
+                val shader = BitmapShader(
+                    bitmap.scale(size, size, false),
+                    Shader.TileMode.CLAMP,
+                    Shader.TileMode.CLAMP
+                )
+
+                val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.shader = shader
+                }
+
+                canvas.drawCircle(radius, radius, radius, imagePaint)
+
+                //crea il bitmap finale con bordo + triangolino in basso
+                val finalHeight = size + 30
+                val finalBitmap = createBitmap(size + padding.toInt() * 2, finalHeight + padding.toInt())
+                val finalCanvas = Canvas(finalBitmap)
+
+                //disegna bordo (cerchio leggermente più grande)
+                val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = android.graphics.Color.RED
+                }
+
+                finalCanvas.drawCircle(
+                    radius + padding,
+                    radius + padding,
+                    radius + 4f,
+                    bgPaint
+                )
+
+                //disegna l'immagine circolare sopra il bordo
+                finalCanvas.drawBitmap(circularBitmap, padding, padding, null)
+
+                //disegna il triangolino/puntatore
+                val pointerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = android.graphics.Color.RED
+                }
+
+                val path = Path().apply {
+                    moveTo(radius + padding - 20, size + padding)
+                    lineTo(radius + padding + 20, size + padding)
+                    lineTo(radius + padding, finalHeight + padding)
+                    close()
+                }
+
+                finalCanvas.drawPath(path, pointerPaint)
+
+                //converte in BitmapDescriptor
+                value = BitmapDescriptorFactory.fromBitmap(finalBitmap)
             }
             else{
                 value = null
@@ -429,7 +489,6 @@ fun rememberBitmapDescriptorFromUrl(fullUrl: String): State<BitmapDescriptor?> {
         }
     }
 }
-
 
 
 //gestione classifiche
