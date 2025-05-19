@@ -65,7 +65,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
@@ -307,24 +306,24 @@ fun Bacheca(
             onDismissRequest = { showDialog = false },
             confirmButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("Close")
+                    Text("Chiudi")
                 }
             },
             title = {
                 Text(
-                    text = "Trip Details: ${trip.name}",
+                    text = trip.name,
                     style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {
                 Column {
                     Text(
-                        text = "Description: ${trip.description}",
+                        text = "Descrizione: ${trip.description}",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Access Code: ${trip.id}",
+                        text = "Codice di accesso: ${trip.id}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -373,7 +372,7 @@ fun Mappa(
             cameraPositionState.animate(
                 update = CameraUpdateFactory.newLatLngZoom(
                     LatLng(first.latitude, first.longitude),
-                    6f
+                    12f
                 )
             )
         }

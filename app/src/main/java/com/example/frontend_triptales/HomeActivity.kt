@@ -238,6 +238,7 @@ fun EditProfile(
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showSuccessMessage by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         avatarUri = uri
@@ -509,25 +510,17 @@ fun EditProfile(
             }
 
             //messaggio di modifica riuscita
-            MessageBanner(
-                message = "Profilo aggiornato con successo!",
-                onClose = { showSuccessMessage = false },
-                icon = Icons.Default.Check,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                visible = showSuccessMessage
-            )
+            if (showSuccessMessage) {
+                Toast.makeText(context, "Profilo aggiornato con successo!", Toast.LENGTH_SHORT).show()
+                showSuccessMessage = false
+                navController.popBackStack()
+            }
 
             //messaggio di errore
             errorMessage?.let {
-                MessageBanner(
-                    message = it,
-                    onClose = { errorMessage = null },
-                    icon = Icons.Default.Warning,
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    visible = true
-                )
+                Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                errorMessage = null
+                navController.popBackStack()
             }
         }
     }
@@ -566,63 +559,6 @@ fun EditProfile(
 
             navController.navigate("home") {
                 popUpTo("home") { inclusive = true }
-            }
-        }
-    }
-}
-
-@Composable
-fun MessageBanner(
-    message: String,
-    onClose: () -> Unit,
-    icon: ImageVector,
-    containerColor: Color,
-    contentColor: Color,
-    visible: Boolean
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it })
-    ) {
-        Box(
-            contentAlignment = Alignment.BottomCenter,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = containerColor)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = contentColor
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Text(
-                        text = message,
-                        color = contentColor
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    IconButton(onClick = onClose) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Chiudi",
-                            tint = contentColor
-                        )
-                    }
-                }
             }
         }
     }

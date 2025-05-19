@@ -175,21 +175,24 @@ fun MainLayout(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.width(300.dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(   //titolo del menu laterale
-                    "TripTales Menu",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                HorizontalDivider()
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "TripTales Menu",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    HorizontalDivider()
 
-                Column {
                     LazyColumn(
+                        modifier = Modifier.weight(1f),  // fa sì che il menu usi lo spazio disponibile
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        item{
+                        item {
                             Text(
                                 text = "Home",
                                 modifier = Modifier
@@ -206,8 +209,18 @@ fun MainLayout(
                             TripDrawerItem(tripId, api, navController)
                         }
                     }
+
+                    HorizontalDivider()
+
+                    Text(
+                        text = "© SegFault Squad",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .align(Alignment.CenterHorizontally)
+                    )
                 }
-                Spacer(Modifier.weight(1f))
             }
         }
     ) {
