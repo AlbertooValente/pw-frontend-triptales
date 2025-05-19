@@ -32,8 +32,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -400,8 +403,8 @@ suspend fun imageLabeling(bitmap: Bitmap): String {
     try {
         val labels = labeler.process(inputImage).await()
 
-        if(labels.isNotEmpty()){
-            sb.append(labels.joinToString(" #") { it.text })
+        if (labels.isNotEmpty()) {
+            sb.append(labels.joinToString(" ") { "#${it.text}" })
         }
     }
     catch(e: Exception){
@@ -441,13 +444,16 @@ fun PostItem(
     post: Post,
     navController: NavController,
     user: UserViewModel,
-    coroutineScope: CoroutineScope
+    coroutineScope: CoroutineScope,
+    tripId: Int
 ) {
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLiked by remember { mutableStateOf(post.likes?.contains(user.user!!.id) == true) }
     var numLike by remember { mutableStateOf(post.likes_count) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var isDeleting by remember { mutableStateOf(false) }
     val isAuthor = user.user!!.id == post.created_by
 
     //carica immagine
@@ -566,6 +572,20 @@ fun PostItem(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
+
+                    //icona cestino solo per autore
+                    if (isAuthor) {
+                        IconButton(
+                            onClick = { showDeleteDialog = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Elimina post",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -616,7 +636,7 @@ fun PostItem(
 
                 //data post
                 Text(
-                    text = "Pubblicato il ${formatDate(post.created_at)}",
+                    text = formatDate(post.created_at),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
@@ -632,6 +652,49 @@ fun PostItem(
                 )
             }
         }
+    }
+
+    //dialog elimina post
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        isDeleting = true
+                        coroutineScope.launch {
+                            try {
+                                val response = api.deletePost("Token ${AuthManager.token}", post.id)
+                                if(response.isSuccessful){
+                                    //ricarica la pagina corrente
+                                    navController.popBackStack()
+                                    navController.navigate("trip/${tripId}")
+                                }
+                                else{
+                                    errorMessage = "Errore nella cancellazione del post (${response.code()})"
+                                }
+                            }
+                            catch(e: Exception){
+                                errorMessage = "Errore durante la cancellazione: ${e.localizedMessage}"
+                            }
+                            finally{
+                                isDeleting = false
+                            }
+                        }
+                    }
+                ) {
+                    Text("Conferma")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Annulla")
+                }
+            },
+            title = { Text("Eliminare questo post?") },
+            text = { Text("Questa azione non può essere annullata.") }
+        )
     }
 }
 

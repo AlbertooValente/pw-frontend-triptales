@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,12 +34,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -105,6 +108,7 @@ fun PostDetailPage(
     var detectedText by remember { mutableStateOf<String?>(null) }
     var showTranslatedText by remember { mutableStateOf(false) }
     val localContext = LocalContext.current
+    val isAuthor = user.user!!.id == post?.created_by
 
     //caricamento post, immagine e autore
     LaunchedEffect(postId) {
@@ -196,19 +200,21 @@ fun PostDetailPage(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
-                        coroutineScope.launch {
-                            handleToggleLike(
-                                api = api,
-                                postId = postId,
-                                isLiked = isLiked,
-                                onSuccess = {
-                                    isLiked = it
-                                    numLike += if (it) 1 else -1
-                                },
-                                onError = {
-                                    errorMessage = it
-                                }
-                            )
+                        if(!isAuthor){
+                            coroutineScope.launch {
+                                handleToggleLike(
+                                    api = api,
+                                    postId = postId,
+                                    isLiked = isLiked,
+                                    onSuccess = {
+                                        isLiked = it
+                                        numLike += if (it) 1 else -1
+                                    },
+                                    onError = {
+                                        errorMessage = it
+                                    }
+                                )
+                            }
                         }
                     }
                 )
@@ -222,6 +228,8 @@ fun PostDetailPage(
             var commentError by remember { mutableStateOf<String?>(null) }
             var commentText by remember { mutableStateOf("") }
             var submittingComment by remember { mutableStateOf(false) }
+            var commentToDelete by remember { mutableStateOf<Comment?>(null) }
+            var showDeleteDialog by remember { mutableStateOf(false) }
 
             //caricamento dei commenti all'avvio
             LaunchedEffect(postId) {
@@ -307,9 +315,13 @@ fun PostDetailPage(
                                     }
                                 ) {
                                     Icon(
-                                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                        imageVector = if (isLiked || isAuthor) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                                         contentDescription = if (isLiked) "Togli like" else "Metti like",
-                                        tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface
+                                        tint = if (isLiked) Color.Red
+                                        else if (isAuthor)
+                                            Color.Gray
+                                        else
+                                            MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                                 Text(
@@ -339,7 +351,6 @@ fun PostDetailPage(
                                 contentDescription = image!!.description ?: "Immagine del post",
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    //.height(300.dp)
                                     .clip(RoundedCornerShape(12.dp)),
                                 contentScale = ContentScale.FillWidth
                             )
@@ -585,6 +596,26 @@ fun PostDetailPage(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                     )
+
+                                    if (comment.author == user.user!!.id) {
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(5.dp)
+                                                .size(24.dp)
+                                                .clickable {
+                                                    commentToDelete = comment
+                                                    showDeleteDialog = true
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Elimina commento",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -601,6 +632,55 @@ fun PostDetailPage(
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
                     }
+                }
+
+                //dialog per l'eliminazione del commento
+                if(showDeleteDialog && commentToDelete != null){
+                    AlertDialog(
+                        onDismissRequest = {
+                            showDeleteDialog = false
+                            commentToDelete = null
+                        },
+                        title = {
+                            Text("Conferma eliminazione")
+                        },
+                        text = {
+                            Text("Sei sicuro di voler eliminare questo commento?")
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showDeleteDialog = false
+                                commentToDelete?.let { comment ->
+                                    coroutineScope.launch {
+                                        try {
+                                            val response = api.deleteComment("Token ${AuthManager.token}", postId, comment.id)
+
+                                            if(response.isSuccessful){
+                                                comments = comments.filterNot { it.id == comment.id }
+                                            }
+                                            else{
+                                                commentError = "Impossibile eliminare il commento"
+                                            }
+                                        }
+                                        catch(e: Exception){
+                                            commentError = "Errore durante l'eliminazione: ${e.localizedMessage}"
+                                        }
+                                    }
+                                }
+                                commentToDelete = null
+                            }) {
+                                Text("Elimina", color = MaterialTheme.colorScheme.error)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                showDeleteDialog = false
+                                commentToDelete = null
+                            }) {
+                                Text("Annulla")
+                            }
+                        }
+                    )
                 }
 
                 //input per inserire nuovi commenti
@@ -634,7 +714,7 @@ fun PostDetailPage(
 
                         IconButton(
                             onClick = {
-                                if (commentText.isNotBlank() && !submittingComment) {
+                                if(commentText.isNotBlank() && !submittingComment){
                                     submittingComment = true
                                     coroutineScope.launch {
                                         try {
@@ -646,7 +726,7 @@ fun PostDetailPage(
 
                                                 newComment?.let {
                                                     //aggiunge il nuovo commento all'elenco
-                                                    comments = comments + it
+                                                    comments = listOf(it) + comments
 
                                                     //aggiunge l'autore alla mappa se non presente
                                                     if (!commentAuthorMap.containsKey(it.author)) {

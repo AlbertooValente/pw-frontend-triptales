@@ -156,8 +156,14 @@ interface TripTalesApi {
         @Path("id") postId: Int
     ): Response<Post>
     /*
-    Modifica ed elimina post
+    Modifica post??
     */
+
+    @DELETE("posts/{id}/")
+    suspend fun deletePost(
+        @Header("Authorization") token: String,
+        @Path("id") postId: Int
+    ): Response<Unit>
 
     @POST("posts/{id}/like/")
     suspend fun giveLike(
@@ -183,21 +189,18 @@ interface TripTalesApi {
         @Path("id") postId: Int,
         @Body request: CreateCommentRequest
     ): Response<Comment>
-    /*
-    Get comment singolo lo faccio?
-     */
 
-    @DELETE("posts/{id}/comments/{idComm}")
+    @DELETE("posts/{id}/comments/{idComm}/")
     suspend fun deleteComment(
         @Header("Authorization") token: String,
         @Path("id") postId: Int,
         @Path("idComm") commentId: Int
-    )
+    ): Response<Unit>
 }
 
 //salvo l'ip del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.1.10:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "http://192.168.100.5:8000"  //da sostituire ogni volta con l'ip del backend
 }
 
 object RetrofitInstance {

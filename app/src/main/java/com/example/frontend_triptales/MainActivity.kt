@@ -163,7 +163,7 @@ fun MainLayout(
     navController: NavController,
     userViewModel: UserViewModel,
     coroutineScope: CoroutineScope,
-    content: @Composable (PaddingValues) -> Unit
+    content: @Composable () -> Unit
 ){
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)    //controlla se l'elemento drawer è aperto o chiuso
 
@@ -251,7 +251,7 @@ fun MainLayout(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                content(innerPadding)
+                content()
             }
         }
     }

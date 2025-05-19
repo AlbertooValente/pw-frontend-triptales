@@ -1,14 +1,11 @@
 package com.example.frontend_triptales
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
-import android.util.Base64
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -282,7 +279,7 @@ fun Bacheca(
 
         //sezione dei post
         items(posts) { post ->
-            PostItem(api, post, navController, user, coroutineScope)
+            PostItem(api, post, navController, user, coroutineScope, trip!!.id)
         }
 
         //se non ci sono post

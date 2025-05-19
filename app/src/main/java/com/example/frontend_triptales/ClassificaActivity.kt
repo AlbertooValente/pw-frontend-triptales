@@ -161,9 +161,7 @@ fun PostRankingItem(post: Post, position: Int) {
         position = position,
         content = {
             //contenuto del post
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Column{
                 Text(
                     text = post.title,
                     style = MaterialTheme.typography.titleMedium,
