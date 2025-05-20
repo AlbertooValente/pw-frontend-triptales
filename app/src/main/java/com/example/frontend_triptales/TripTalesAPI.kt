@@ -155,9 +155,14 @@ interface TripTalesApi {
         @Header("Authorization") token: String,
         @Path("id") postId: Int
     ): Response<Post>
-    /*
-    Modifica post??
-    */
+
+    @Multipart
+    @PATCH("posts/{id}/")
+    suspend fun updatePost(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Part parts: List<MultipartBody.Part>
+    ): Response<Post>
 
     @DELETE("posts/{id}/")
     suspend fun deletePost(

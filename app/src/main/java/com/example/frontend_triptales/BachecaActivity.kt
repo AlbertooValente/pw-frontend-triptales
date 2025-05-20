@@ -30,16 +30,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +56,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,6 +78,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.MediaType.Companion.toMediaType
@@ -221,7 +227,7 @@ fun CreatePostScreen(
                             )
                             .clickable {
                                 //richiedi permesso fotocamera quando l'utente clicca sul box
-                                cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -415,12 +421,14 @@ suspend fun imageLabeling(bitmap: Bitmap): String {
 }
 
 //converte un'API asincrona basata su Task<T> in una funzione suspend compatibile con le coroutine
+@OptIn(ExperimentalCoroutinesApi::class)
 suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
     addOnSuccessListener { result -> cont.resume(result) {} }
     addOnFailureListener { exception -> cont.resumeWithException(exception) }
 }
 
 //funzione per ottenere la posizione
+@OptIn(ExperimentalCoroutinesApi::class)
 @SuppressLint("MissingPermission")
 suspend fun getCurrentLocation(context: Context): Location? {
     val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -451,10 +459,13 @@ fun PostItem(
     var author by remember { mutableStateOf<User?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLiked by remember { mutableStateOf(post.likes?.contains(user.user!!.id) == true) }
-    var numLike by remember { mutableStateOf(post.likes_count) }
+    var numLike by remember { mutableIntStateOf(post.likes_count) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     val isAuthor = user.user!!.id == post.created_by
+
+    //gestione dropdown modifica/elimina post
+    var expanded by remember { mutableStateOf(false) }
 
     //carica immagine
     LaunchedEffect(post.image) {
@@ -575,15 +586,30 @@ fun PostItem(
 
                     //icona cestino solo per autore
                     if (isAuthor) {
-                        IconButton(
-                            onClick = { showDeleteDialog = true },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Elimina post",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                        Box {
+                            IconButton(onClick = { expanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                            }
+
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Modifica") },
+                                    onClick = {
+                                        expanded = false
+                                        navController.navigate("edit_post/${post.id}")
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Elimina") },
+                                    onClick = {
+                                        expanded = false
+                                        showDeleteDialog = true
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -746,5 +772,144 @@ fun formatDate(sqlDate: String): String {
     }
     catch(e: Exception){
         sqlDate
+    }
+}
+
+
+//funzione per la modifica del post
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditPostScreen(
+    api: TripTalesApi,
+    postId: Int,
+    navController: NavController,
+    coroutineScope: CoroutineScope
+) {
+    var post by remember { mutableStateOf<Post?>(null) }
+    var title by remember { mutableStateOf(post?.title) }
+    var image by remember { mutableStateOf<Image?>(null) }
+    var description by remember { mutableStateOf(post?.description ?: "") }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showSuccessMessage by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(postId) {
+        try {
+            val postResponse = api.getPost("Token ${AuthManager.token}", postId)
+
+            if(postResponse.isSuccessful){
+                post = postResponse.body()
+
+                post?.image?.let { imageId ->
+                    val imgResp = api.getImage("Token ${AuthManager.token}", imageId)
+                    if (imgResp.isSuccessful) image = imgResp.body()
+                }
+            }
+            else{
+                errorMessage = "Errore nel recupero del post"
+            }
+        }
+        catch(e: Exception){
+            errorMessage = "Errore: ${e.localizedMessage}"
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Modifica Post") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        coroutineScope.launch {
+                            isLoading = true
+                            val parts = mutableListOf<MultipartBody.Part>()
+
+                            parts.add(MultipartBody.Part.createFormData("title", title!!))
+                            parts.add(MultipartBody.Part.createFormData("description", description))
+
+                            try {
+                                val response = api.updatePost("Token ${AuthManager.token}", postId, parts)
+
+                                if(response.isSuccessful){
+                                    showSuccessMessage = true
+                                }
+                                else{
+                                    errorMessage = "Errore aggiornamento"
+                                }
+                            }
+                            catch(e: Exception){
+                                errorMessage = "Errore di rete"
+                            }
+                            finally{
+                                isLoading = false
+                            }
+                        }
+                    }) {
+                        Icon(Icons.Default.Check, contentDescription = "Salva")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            if(isLoading){
+                CircularProgressIndicator()
+            }
+
+            OutlinedTextField(
+                value = title!!,
+                onValueChange = { title = it },
+                label = { Text("Titolo") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Descrizione") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            image?.let {
+                AsyncImage(
+                    model = it.image,
+                    contentDescription = it.description ?: "Immagine del post",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .padding(bottom = 8.dp),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = it.description ?: "Nessuna descrizione",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (showSuccessMessage) {
+                Toast.makeText(context, "Post aggiornato con successo!", Toast.LENGTH_SHORT).show()
+                showSuccessMessage = false
+                navController.popBackStack()
+            }
+
+            errorMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+        }
     }
 }
