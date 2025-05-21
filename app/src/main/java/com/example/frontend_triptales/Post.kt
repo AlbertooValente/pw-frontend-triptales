@@ -9,5 +9,5 @@ data class Post(
     val image: Int,
     val group: Int,
     val likes_count: Int,
-    val likes: List<Int>?
+    val liked_user_ids: List<Int>?
 )

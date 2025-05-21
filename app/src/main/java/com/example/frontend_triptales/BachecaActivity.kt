@@ -458,11 +458,9 @@ fun PostItem(
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLiked by remember { mutableStateOf(post.likes?.contains(user.user!!.id) == true) }
     var numLike by remember { mutableIntStateOf(post.likes_count) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
-    val isAuthor = user.user!!.id == post.created_by
 
     //gestione dropdown modifica/elimina post
     var expanded by remember { mutableStateOf(false) }
@@ -500,6 +498,16 @@ fun PostItem(
         }
         catch(e: Exception){
             errorMessage = "Errore nel recupero dell'autore: ${e.localizedMessage}"
+        }
+    }
+
+    val currentUserId = user.user?.id
+    val isAuthor = user.user?.id == post.created_by
+    var isLiked by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(currentUserId, post.liked_user_ids){
+        if(currentUserId != null){
+            isLiked = post.liked_user_ids?.contains(currentUserId) == true
         }
     }
 
@@ -570,11 +578,11 @@ fun PostItem(
                         Icon(
                             imageVector = if (isLiked || isAuthor) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                             contentDescription = if (isLiked) "Togli like" else "Metti like",
-                            tint = if (isLiked) Color.Red
-                            else if (isAuthor)
-                                Color.Gray
-                            else
-                                MaterialTheme.colorScheme.onSurface
+                            tint = when {
+                                isLiked -> Color.Red
+                                isAuthor -> Color.Gray
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
                         )
                     }
 
@@ -586,30 +594,28 @@ fun PostItem(
 
                     //icona cestino solo per autore
                     if (isAuthor) {
-                        Box {
-                            IconButton(onClick = { expanded = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                            }
+                        IconButton(onClick = { expanded = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                        }
 
-                            DropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Modifica") },
-                                    onClick = {
-                                        expanded = false
-                                        navController.navigate("edit_post/${post.id}")
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Elimina") },
-                                    onClick = {
-                                        expanded = false
-                                        showDeleteDialog = true
-                                    }
-                                )
-                            }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Modifica") },
+                                onClick = {
+                                    expanded = false
+                                    navController.navigate("edit_post/${post.id}")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Elimina") },
+                                onClick = {
+                                    expanded = false
+                                    showDeleteDialog = true
+                                }
+                            )
                         }
                     }
                 }
@@ -786,7 +792,7 @@ fun EditPostScreen(
     coroutineScope: CoroutineScope
 ) {
     var post by remember { mutableStateOf<Post?>(null) }
-    var title by remember { mutableStateOf(post?.title) }
+    var title by remember { mutableStateOf(post?.title ?: "") }
     var image by remember { mutableStateOf<Image?>(null) }
     var description by remember { mutableStateOf(post?.description ?: "") }
     var isLoading by remember { mutableStateOf(false) }
@@ -812,6 +818,13 @@ fun EditPostScreen(
         }
         catch(e: Exception){
             errorMessage = "Errore: ${e.localizedMessage}"
+        }
+    }
+
+    LaunchedEffect(post) {
+        post?.let {
+            title = it.title
+            description = it.description ?: ""
         }
     }
 
@@ -867,11 +880,12 @@ fun EditPostScreen(
             }
 
             OutlinedTextField(
-                value = title!!,
+                value = title,
                 onValueChange = { title = it },
                 label = { Text("Titolo") },
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedTextField(
                 value = description,
@@ -879,6 +893,7 @@ fun EditPostScreen(
                 label = { Text("Descrizione") },
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(modifier = Modifier.height(8.dp))
 
             image?.let {
                 AsyncImage(
@@ -898,7 +913,6 @@ fun EditPostScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
             if (showSuccessMessage) {

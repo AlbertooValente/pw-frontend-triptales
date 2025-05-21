@@ -57,6 +57,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -97,13 +98,11 @@ fun PostDetailPage(
     var post by remember { mutableStateOf<Post?>(null) }
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
-    var isLiked by remember { mutableStateOf(post?.likes?.contains(user.user!!.id) == true) }
-    var numLike by remember { mutableStateOf(post?.likes_count ?: 0) }
+    var numLike by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var detectedText by remember { mutableStateOf<String?>(null) }
     var showTranslatedText by remember { mutableStateOf(false) }
     val localContext = LocalContext.current
-    val isAuthor = user.user!!.id == post?.created_by
 
     //caricamento post, immagine e autore
     LaunchedEffect(postId) {
@@ -112,6 +111,11 @@ fun PostDetailPage(
 
             if(postResponse.isSuccessful){
                 post = postResponse.body()
+
+                //aggiornoil numero di like
+                post?.likes_count?.let { likes ->
+                    numLike = likes
+                }
 
                 post?.image?.let { imageId ->
                     val imgResp = api.getImage("Token ${AuthManager.token}", imageId)
@@ -129,6 +133,16 @@ fun PostDetailPage(
         }
         catch(e: Exception){
             errorMessage = "Errore: ${e.localizedMessage}"
+        }
+    }
+
+    val currentUserId = user.user?.id
+    val isAuthor = user.user?.id == post?.created_by
+    var isLiked by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentUserId, post?.liked_user_ids){
+        if(currentUserId != null){
+            isLiked = post?.liked_user_ids?.contains(currentUserId) == true
         }
     }
 
