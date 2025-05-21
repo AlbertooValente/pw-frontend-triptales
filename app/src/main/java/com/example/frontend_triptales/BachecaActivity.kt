@@ -457,6 +457,7 @@ fun PostItem(
 ) {
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
+    var badge by remember { mutableStateOf<Badge?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var numLike by remember { mutableIntStateOf(post.likes_count) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -493,11 +494,28 @@ fun PostItem(
                 author = response.body()
             }
             else{
-                errorMessage = "Errore nel recupero dell'autore (Codice ${response.code()})"
+                errorMessage = "Errore nel recupero dell'autore"
             }
         }
         catch(e: Exception){
-            errorMessage = "Errore nel recupero dell'autore: ${e.localizedMessage}"
+            errorMessage = "Errore di rete"
+        }
+    }
+
+    //carica badge
+    LaunchedEffect(tripId) {
+        try {
+            val response = api.getBadge("Token ${AuthManager.token}", tripId, author!!.id)
+
+            if(response.isSuccessful){
+                badge = response.body()
+            }
+            else{
+                errorMessage = "Errore nel recupero del badge"
+            }
+        }
+        catch(e: Exception){
+            errorMessage = "Errore di rete"
         }
     }
 
@@ -537,7 +555,7 @@ fun PostItem(
                         }
                     },
                     onTap = {
-                        navController.navigate("postDetailPage/${post.id}")
+                        navController.navigate("postDetailPage/${tripId}/${post.id}")
                     }
                 )
             }
@@ -652,6 +670,15 @@ fun PostItem(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.End
                 ) {
+                    badge?.name?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     AsyncImage(
                         model = Constants.BASE_URL + author?.avatar,
                         contentDescription = "Profilo di ${author?.username}",
@@ -843,7 +870,7 @@ fun EditPostScreen(
                             isLoading = true
                             val parts = mutableListOf<MultipartBody.Part>()
 
-                            parts.add(MultipartBody.Part.createFormData("title", title!!))
+                            parts.add(MultipartBody.Part.createFormData("title", title))
                             parts.add(MultipartBody.Part.createFormData("description", description))
 
                             try {

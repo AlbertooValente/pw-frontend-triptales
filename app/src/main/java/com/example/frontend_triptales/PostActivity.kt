@@ -90,6 +90,7 @@ import java.net.URL
 @Composable
 fun PostDetailPage(
     api: TripTalesApi,
+    tripId: Int,
     postId: Int,
     navController: NavController,
     coroutineScope: CoroutineScope,
@@ -98,6 +99,7 @@ fun PostDetailPage(
     var post by remember { mutableStateOf<Post?>(null) }
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
+    var badge by remember { mutableStateOf<Badge?>(null) }
     var numLike by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var detectedText by remember { mutableStateOf<String?>(null) }
@@ -133,6 +135,23 @@ fun PostDetailPage(
         }
         catch(e: Exception){
             errorMessage = "Errore: ${e.localizedMessage}"
+        }
+    }
+
+    //carica badge
+    LaunchedEffect(tripId) {
+        try {
+            val response = api.getBadge("Token ${AuthManager.token}", tripId, author!!.id)
+
+            if(response.isSuccessful){
+                badge = response.body()
+            }
+            else{
+                errorMessage = "Errore nel recupero del badge"
+            }
+        }
+        catch(e: Exception){
+            errorMessage = "Errore di rete"
         }
     }
 
@@ -467,6 +486,15 @@ fun PostDetailPage(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End
                             ) {
+                                badge?.name?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+
                                 AsyncImage(
                                     model = Constants.BASE_URL + author?.avatar,
                                     contentDescription = "Profilo di ${author?.username}",

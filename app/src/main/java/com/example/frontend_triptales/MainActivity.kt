@@ -147,10 +147,11 @@ fun AppNav(){
             CreatePostScreen(api, coroutineScope, navController, tripId!!)
         }
 
-        composable("postDetailPage/{postId}"){ backStackEntry ->
+        composable("postDetailPage/{tripId}/{postId}"){ backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString("tripId")?.toIntOrNull()
             val postId = backStackEntry.arguments?.getString("postId")?.toIntOrNull()
 
-            PostDetailPage(api, postId!!, navController, coroutineScope, user)
+            PostDetailPage(api, tripId!!, postId!!, navController, coroutineScope, user)
         }
 
         composable("edit_post/{postId}"){ backStackEntry ->

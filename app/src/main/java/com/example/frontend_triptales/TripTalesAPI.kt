@@ -124,6 +124,13 @@ interface TripTalesApi {
         @Path("id") tripId: Int
     ): Response<List<UserPosts>>
 
+    @GET("trips/{tripId}/badge/{userId}/")
+    suspend fun getBadge(
+        @Header("Authorization") token: String,
+        @Path("tripId") tripId: Int,
+        @Path("userId") userId: Int
+    ): Response<Badge>
+
 
     //IMAGES
     @Multipart
