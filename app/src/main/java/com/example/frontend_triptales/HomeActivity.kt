@@ -204,7 +204,6 @@ fun handleLogout(
     navController: NavController,
     userViewModel: UserViewModel
 ){
-    //AuthManager.token = null
     userViewModel.logout()
 
     navController.navigate("auth") {

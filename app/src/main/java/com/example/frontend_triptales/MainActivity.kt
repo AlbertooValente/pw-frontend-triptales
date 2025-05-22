@@ -96,13 +96,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-//mantiene loggato l'utente per tutta la durata della sessione di utilizzo dell'app
-/*
-object AuthManager {
-    var token: String? = null
-}
- */
-
 //gestisce la navigazione tra le varie pagine dell'applicazione
 @Composable
 fun AppNav(){
@@ -738,7 +731,7 @@ fun RegistrationForm(
                         }
                     }
                     catch(e: Exception){
-                        errorMessage = "Errore di rete: ${e.localizedMessage}"  //modifica a fine progetto
+                        errorMessage = "Errore di rete"
                     }
                 }
             },

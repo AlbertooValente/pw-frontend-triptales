@@ -145,7 +145,7 @@ fun CreatePostScreen(
                 cameraLauncher.launch(photoUri)
             }
             catch(e: Exception){
-                errorMessage = "Errore nell'avvio della fotocamera: ${e.localizedMessage}"
+                errorMessage = "Errore nell'avvio della fotocamera"
             }
         }
         else{
@@ -363,7 +363,7 @@ fun CreatePostScreen(
                                     }
                                 }
                                 catch(e: Exception){
-                                    errorMessage = "Errore: ${e.localizedMessage}"
+                                    errorMessage = "Errore di rete"
                                 }
                                 finally{
                                     isLoading = false
@@ -477,11 +477,11 @@ fun PostItem(
                     image = response.body()
                 }
                 else{
-                    errorMessage = "Errore nel caricamento dell'immagine (Codice ${response.code()})"
+                    errorMessage = "Errore nel caricamento dell'immagine"
                 }
             }
             catch(e: Exception){
-                errorMessage = "Errore nel caricamento dell'immagine: ${e.localizedMessage}"
+                errorMessage = "Errore di rete"
             }
         }
     }
@@ -517,7 +517,7 @@ fun PostItem(
                 }
             }
             catch(e: Exception){
-                errorMessage = "Errore di rete: ${e.message ?: "sconosciuto"}"
+                errorMessage = "Errore di rete"
             }
         }
     }
@@ -737,11 +737,11 @@ fun PostItem(
                                     navController.navigate("trip/${tripId}")
                                 }
                                 else{
-                                    errorMessage = "Errore nella cancellazione del post (${response.code()})"
+                                    errorMessage = "Errore nella cancellazione del post"
                                 }
                             }
                             catch(e: Exception){
-                                errorMessage = "Errore durante la cancellazione: ${e.localizedMessage}"
+                                errorMessage = "Errore di rete"
                             }
                             finally{
                                 isDeleting = false
@@ -845,7 +845,7 @@ fun EditPostScreen(
             }
         }
         catch(e: Exception){
-            errorMessage = "Errore: ${e.localizedMessage}"
+            errorMessage = "Errore di rete"
         }
     }
 

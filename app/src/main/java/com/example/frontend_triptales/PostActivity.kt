@@ -137,7 +137,7 @@ fun PostDetailPage(
             }
         }
         catch(e: Exception){
-            errorMessage = "Errore: ${e.localizedMessage}"
+            errorMessage = "Errore di rete"
         }
     }
 
@@ -182,7 +182,7 @@ fun PostDetailPage(
                 }
             }
             catch(e: Exception){
-                errorMessage = "Errore di rete: ${e.message ?: "sconosciuto"}"
+                errorMessage = "Errore di rete"
             }
         }
     }
@@ -440,11 +440,11 @@ fun PostDetailPage(
                                                         navController.popBackStack()
                                                     }
                                                     else{
-                                                        errorMessage = "Errore nella cancellazione del post (${response.code()})"
+                                                        errorMessage = "Errore nella cancellazione del post "
                                                     }
                                                 }
                                                 catch(e: Exception){
-                                                    errorMessage = "Errore durante la cancellazione: ${e.localizedMessage}"
+                                                    errorMessage = "Errore di rete"
                                                 }
                                                 finally{
                                                     isDeleting = false
@@ -696,7 +696,7 @@ fun PostDetailPage(
                                         errorMessage = "Errore nel recupero del badge"
                                     }
                                 } catch (e: Exception) {
-                                    errorMessage = "Errore di rete: ${e.message ?: "sconosciuto"}"
+                                    errorMessage = "Errore di rete"
                                 }
                             }
                         }
