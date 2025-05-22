@@ -129,7 +129,7 @@ interface TripTalesApi {
         @Header("Authorization") token: String,
         @Path("tripId") tripId: Int,
         @Path("userId") userId: Int
-    ): Response<Badge>
+    ): Response<UserWithBadge>
 
 
     //IMAGES

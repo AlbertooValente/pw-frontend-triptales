@@ -99,7 +99,7 @@ fun PostDetailPage(
     var post by remember { mutableStateOf<Post?>(null) }
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
-    var badge by remember { mutableStateOf<Badge?>(null) }
+    var authorWithBadge by remember { mutableStateOf<UserWithBadge?>(null) }
     var numLike by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var detectedText by remember { mutableStateOf<String?>(null) }
@@ -138,16 +138,16 @@ fun PostDetailPage(
         }
     }
 
-    //carica badge
-    LaunchedEffect(tripId) {
+    //carica autore
+    LaunchedEffect(post?.created_by) {
         try {
-            val response = api.getBadge("Token ${AuthManager.token}", tripId, author!!.id)
+            val response = api.getUserById("Token ${AuthManager.token}", post!!.created_by)
 
             if(response.isSuccessful){
-                badge = response.body()
+                author = response.body()
             }
             else{
-                errorMessage = "Errore nel recupero del badge"
+                errorMessage = "Errore nel recupero dell'autore"
             }
         }
         catch(e: Exception){
@@ -162,6 +162,25 @@ fun PostDetailPage(
     LaunchedEffect(currentUserId, post?.liked_user_ids){
         if(currentUserId != null){
             isLiked = post?.liked_user_ids?.contains(currentUserId) == true
+        }
+    }
+
+    //carica badge
+    LaunchedEffect(author){
+        if(author != null){
+            try {
+                val response = api.getBadge("Token ${AuthManager.token}", tripId, author!!.id)
+
+                if(response.isSuccessful){
+                    authorWithBadge = response.body()
+                }
+                else{
+                    errorMessage = "Errore nel recupero del badge"
+                }
+            }
+            catch(e: Exception){
+                errorMessage = "Errore di rete: ${e.message ?: "sconosciuto"}"
+            }
         }
     }
 
@@ -486,14 +505,7 @@ fun PostDetailPage(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End
                             ) {
-                                badge?.name?.let {
-                                    Text(
-                                        text = it,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
+                                BadgeComponent(authorWithBadge, Modifier)
 
                                 AsyncImage(
                                     model = Constants.BASE_URL + author?.avatar,
@@ -587,6 +599,26 @@ fun PostDetailPage(
                     //lista commenti
                     items(comments) { comment ->
                         val commentAuthor = commentAuthorMap[comment.author]
+                        var cAuthorWithBadge by remember { mutableStateOf<UserWithBadge?>(null) }
+
+                        //carica badge
+                        LaunchedEffect(author){
+                            if(author != null){
+                                try {
+                                    val response = api.getBadge("Token ${AuthManager.token}", tripId, commentAuthor!!.id)
+
+                                    if(response.isSuccessful){
+                                        cAuthorWithBadge = response.body()
+                                    }
+                                    else{
+                                        errorMessage = "Errore nel recupero del badge"
+                                    }
+                                }
+                                catch(e: Exception){
+                                    errorMessage = "Errore di rete: ${e.message ?: "sconosciuto"}"
+                                }
+                            }
+                        }
 
                         Card(
                             shape = RoundedCornerShape(8.dp),
@@ -604,6 +636,8 @@ fun PostDetailPage(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    BadgeComponent(cAuthorWithBadge, Modifier)
+
                                     AsyncImage(
                                         model = Constants.BASE_URL + commentAuthor?.avatar,
                                         contentDescription = "Avatar di ${commentAuthor?.username}",

@@ -457,7 +457,7 @@ fun PostItem(
 ) {
     var image by remember { mutableStateOf<Image?>(null) }
     var author by remember { mutableStateOf<User?>(null) }
-    var badge by remember { mutableStateOf<Badge?>(null) }
+    var authorWithBadge by remember { mutableStateOf<UserWithBadge?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var numLike by remember { mutableIntStateOf(post.likes_count) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -503,19 +503,21 @@ fun PostItem(
     }
 
     //carica badge
-    LaunchedEffect(tripId) {
-        try {
-            val response = api.getBadge("Token ${AuthManager.token}", tripId, author!!.id)
+    LaunchedEffect(author) {
+        if(author != null){
+            try {
+                val response = api.getBadge("Token ${AuthManager.token}", tripId, author!!.id)
 
-            if(response.isSuccessful){
-                badge = response.body()
+                if(response.isSuccessful){
+                    authorWithBadge = response.body()
+                }
+                else{
+                    errorMessage = "Errore nel recupero del badge"
+                }
             }
-            else{
-                errorMessage = "Errore nel recupero del badge"
+            catch(e: Exception){
+                errorMessage = "Errore di rete: ${e.message ?: "sconosciuto"}"
             }
-        }
-        catch(e: Exception){
-            errorMessage = "Errore di rete"
         }
     }
 
@@ -670,14 +672,7 @@ fun PostItem(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.End
                 ) {
-                    badge?.name?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    BadgeComponent(authorWithBadge, Modifier)
 
                     AsyncImage(
                         model = Constants.BASE_URL + author?.avatar,
@@ -952,5 +947,32 @@ fun EditPostScreen(
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
         }
+    }
+}
+
+
+//visualizzazione del badge
+@Composable
+fun BadgeComponent(
+    authorWithBadge: UserWithBadge?,
+    modifier: Modifier = Modifier
+) {
+    authorWithBadge?.badge?.name?.let { badgeName ->
+        Box(
+            modifier = modifier
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline,
+                    shape = RoundedCornerShape(6.dp)
+                )
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = badgeName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
     }
 }
