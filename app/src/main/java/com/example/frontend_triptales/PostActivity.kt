@@ -2,7 +2,7 @@
 
 package com.example.frontend_triptales
 
-import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.location.Geocoder
 import android.util.Log
 import android.widget.Toast
@@ -78,7 +78,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.mlkit.nl.languageid.LanguageIdentification
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
@@ -90,7 +92,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.URL
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -195,12 +196,18 @@ fun PostDetailPage(
     LaunchedEffect(image?.image) {
         image?.image?.let { imageUrl ->
             try {
-                val bitmap = withContext(Dispatchers.IO) {
-                    val input = URL(imageUrl).openStream()
-                    BitmapFactory.decodeStream(input)
+                val loader = ImageLoader(localContext)
+
+                val request = ImageRequest.Builder(localContext)
+                    .data(imageUrl)
+                    .allowHardware(false) //necessario per ottenere un Bitmap
+                    .build()
+
+                val result = withContext(Dispatchers.IO) {
+                    (loader.execute(request).drawable as? BitmapDrawable)?.bitmap
                 }
 
-                val inputImage = InputImage.fromBitmap(bitmap, 0)
+                val inputImage = InputImage.fromBitmap(result!!, 0)
                 val textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                 val languageIdentifier = LanguageIdentification.getClient()
 
@@ -226,7 +233,7 @@ fun PostDetailPage(
                         detectedText = "Tradotto dal ${languageCode.uppercase()}: $translatedText"
                     }
                     else{
-                        detectedText = "Testo rilevato: $recognizedText"
+                        detectedText = "Testo rilevato (${languageCode}): $recognizedText"
                     }
                 }
             }
@@ -449,7 +456,7 @@ fun PostDetailPage(
                         }
 
                         //dialog elimina post
-                        if (showDeletePostDialog) {
+                        if(showDeletePostDialog){
                             AlertDialog(
                                 onDismissRequest = { showDeletePostDialog = false },
                                 confirmButton = {
