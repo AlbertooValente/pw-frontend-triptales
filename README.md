@@ -89,8 +89,8 @@ object Constants {
 ```
 
 Sostituisci il valore con l'indirizzo corretto del backend:
-* In locale su Wi-Fi: usa l'IP del server, es. http://192.168.1.123:8000
-* Con ngrok: usa il dominio https fornito da ngrok, es. https://abcd1234.ngrok.io
+* In locale su Wi-Fi: usa l'IP del server, es. `http://192.168.1.123:8000`
+* Con ngrok: usa il dominio `https` fornito da ngrok, es. `https://abcd1234.ngrok.io`
   
 ### 4. Esegui il progetto
 Collega un dispositivo Android oppure usa un emulatore, quindi premi Run ▶️ da Android Studio.
