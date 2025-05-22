@@ -53,6 +53,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -96,9 +97,11 @@ class MainActivity : ComponentActivity() {
 }
 
 //mantiene loggato l'utente per tutta la durata della sessione di utilizzo dell'app
+/*
 object AuthManager {
     var token: String? = null
 }
+ */
 
 //gestisce la navigazione tra le varie pagine dell'applicazione
 @Composable
@@ -113,6 +116,7 @@ fun AppNav(){
             AppLogin(
                 api = api,
                 coroutineScope = coroutineScope,
+                user = user,
                 onLoginSuccess = {
                     user.loadUser(api)
 
@@ -144,7 +148,7 @@ fun AppNav(){
         composable("create_post/{tripId}"){ backStackEntry ->
             val tripId = backStackEntry.arguments?.getString("tripId")?.toIntOrNull()
 
-            CreatePostScreen(api, coroutineScope, navController, tripId!!)
+            CreatePostScreen(api, coroutineScope, navController, tripId!!, user)
         }
 
         composable("postDetailPage/{tripId}/{postId}"){ backStackEntry ->
@@ -157,7 +161,7 @@ fun AppNav(){
         composable("edit_post/{postId}"){ backStackEntry ->
             val postId = backStackEntry.arguments?.getString("postId")?.toIntOrNull()
 
-            EditPostScreen(api, postId!!, navController, coroutineScope)
+            EditPostScreen(api, postId!!, navController, coroutineScope, user)
         }
     }
 }
@@ -213,7 +217,7 @@ fun MainLayout(
                         }
 
                         items(userViewModel.trips ?: emptyList()) { tripId ->
-                            TripDrawerItem(tripId, api, navController)
+                            TripDrawerItem(tripId, api, navController, userViewModel)
                         }
                     }
 
@@ -281,13 +285,14 @@ fun MainLayout(
 fun TripDrawerItem(
     tripId: Int,
     api: TripTalesApi,
-    navController: NavController
+    navController: NavController,
+    user: UserViewModel
 ) {
     var tripName by remember { mutableStateOf("Trip $tripId") }
 
     LaunchedEffect(tripId) {
         try {
-            val response = api.getTripInfo("Token ${AuthManager.token!!}", tripId)
+            val response = api.getTripInfo("Token ${user.token}", tripId)
 
             if(response.isSuccessful){
                 tripName = response.body()?.name ?: "Trip $tripId"
@@ -316,10 +321,11 @@ fun TripDrawerItem(
 fun AppLogin(
     api: TripTalesApi,
     coroutineScope: CoroutineScope,
+    user: UserViewModel,
     onLoginSuccess: () -> Unit
 ) {
     //tiene traccia del tab selezionato (0 = login, 1 = registrazione)
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     Box(
         modifier = Modifier
@@ -429,16 +435,8 @@ fun AppLogin(
             Spacer(modifier = Modifier.height(24.dp))
 
             when(selectedTab){
-                0 -> LoginForm(
-                    coroutineScope,
-                    api,
-                    onLoginSuccess = onLoginSuccess
-                )
-                1 -> RegistrationForm(
-                    coroutineScope,
-                    api,
-                    onLoginSuccess = onLoginSuccess
-                )
+                0 -> LoginForm( coroutineScope, api, user, onLoginSuccess = onLoginSuccess)
+                1 -> RegistrationForm(coroutineScope, api, user, onLoginSuccess = onLoginSuccess)
             }
         }
     }
@@ -448,6 +446,7 @@ fun AppLogin(
 fun LoginForm(
     coroutineScope: CoroutineScope,
     apiService: TripTalesApi,
+    user: UserViewModel,
     onLoginSuccess: () -> Unit
 ) {
     var username by remember { mutableStateOf("") }
@@ -503,7 +502,7 @@ fun LoginForm(
                             val token = response.body()?.token
 
                             if(!token.isNullOrEmpty()){
-                                AuthManager.token = token
+                                user.setUserToken(token)
                                 onLoginSuccess()
                             }
                         }
@@ -544,6 +543,7 @@ fun LoginForm(
 fun RegistrationForm(
     coroutineScope: CoroutineScope,
     apiService: TripTalesApi,
+    user: UserViewModel,
     onLoginSuccess: () -> Unit
 ) {
     var username by remember { mutableStateOf("") }
@@ -729,7 +729,7 @@ fun RegistrationForm(
                             val token = response.body()?.token
 
                             if(!token.isNullOrEmpty()){
-                                AuthManager.token = token
+                                user.setUserToken(token)
                                 onLoginSuccess()
                             }
                         }

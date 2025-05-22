@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
@@ -42,6 +43,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -109,7 +112,7 @@ fun PostDetailPage(
     //caricamento post, immagine e autore
     LaunchedEffect(postId) {
         try {
-            val postResponse = api.getPost("Token ${AuthManager.token}", postId)
+            val postResponse = api.getPost("Token ${user.token}", postId)
 
             if(postResponse.isSuccessful){
                 post = postResponse.body()
@@ -120,12 +123,12 @@ fun PostDetailPage(
                 }
 
                 post?.image?.let { imageId ->
-                    val imgResp = api.getImage("Token ${AuthManager.token}", imageId)
+                    val imgResp = api.getImage("Token ${user.token}", imageId)
                     if (imgResp.isSuccessful) image = imgResp.body()
                 }
 
                 post?.created_by?.let { userId ->
-                    val userResp = api.getUserById("Token ${AuthManager.token}", userId)
+                    val userResp = api.getUserById("Token ${user.token}", userId)
                     if (userResp.isSuccessful) author = userResp.body()
                 }
             }
@@ -141,7 +144,7 @@ fun PostDetailPage(
     //carica autore
     LaunchedEffect(post?.created_by) {
         try {
-            val response = api.getUserById("Token ${AuthManager.token}", post!!.created_by)
+            val response = api.getUserById("Token ${user.token}", post!!.created_by)
 
             if(response.isSuccessful){
                 author = response.body()
@@ -169,7 +172,7 @@ fun PostDetailPage(
     LaunchedEffect(author){
         if(author != null){
             try {
-                val response = api.getBadge("Token ${AuthManager.token}", tripId, author!!.id)
+                val response = api.getBadge("Token ${user.token}", tripId, author!!.id)
 
                 if(response.isSuccessful){
                     authorWithBadge = response.body()
@@ -253,6 +256,7 @@ fun PostDetailPage(
                                     api = api,
                                     postId = postId,
                                     isLiked = isLiked,
+                                    user = user,
                                     onSuccess = {
                                         isLiked = it
                                         numLike += if (it) 1 else -1
@@ -277,11 +281,16 @@ fun PostDetailPage(
             var submittingComment by remember { mutableStateOf(false) }
             var commentToDelete by remember { mutableStateOf<Comment?>(null) }
             var showDeleteDialog by remember { mutableStateOf(false) }
+            var showDeletePostDialog by remember { mutableStateOf(false) }
+            var isDeleting by remember { mutableStateOf(false) }
+
+            //gestione dropdown modifica/elimina post
+            var expanded by remember { mutableStateOf(false) }
 
             //caricamento dei commenti all'avvio
             LaunchedEffect(postId) {
                 try {
-                    val response = api.getComments("Token ${AuthManager.token}", postId)
+                    val response = api.getComments("Token ${user.token}", postId)
 
                     if(response.isSuccessful){
                         comments = response.body() ?: emptyList()
@@ -292,7 +301,7 @@ fun PostDetailPage(
 
                         authorIds.forEach { authorId ->
                             try {
-                                val userResponse = api.getUserById("Token ${AuthManager.token}", authorId)
+                                val userResponse = api.getUserById("Token ${user.token}", authorId)
 
                                 if(userResponse.isSuccessful){
                                     userResponse.body()?.let { user ->
@@ -300,7 +309,7 @@ fun PostDetailPage(
                                     }
                                 }
                             }
-                            catch(e: Exception){ }
+                            catch(_: Exception){ }
                         }
 
                         commentAuthorMap = authors
@@ -348,6 +357,7 @@ fun PostDetailPage(
                                                 api = api,
                                                 postId = postId,
                                                 isLiked = isLiked,
+                                                user = user,
                                                 onSuccess = {
                                                     isLiked = it
                                                     numLike += if (it) 1 else -1
@@ -374,6 +384,33 @@ fun PostDetailPage(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
+
+                                //icona cestino solo per autore
+                                if (isAuthor){
+                                    IconButton(onClick = { expanded = true }) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = expanded,
+                                        onDismissRequest = { expanded = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Modifica") },
+                                            onClick = {
+                                                expanded = false
+                                                navController.navigate("edit_post/${postId}")
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Elimina") },
+                                            onClick = {
+                                                expanded = false
+                                                showDeletePostDialog = true
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -384,6 +421,48 @@ fun PostDetailPage(
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Spacer(modifier = Modifier.height(16.dp))
+                        }
+
+                        //dialog elimina post
+                        if (showDeletePostDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showDeletePostDialog = false },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showDeletePostDialog = false
+                                            isDeleting = true
+                                            coroutineScope.launch {
+                                                try {
+                                                    val response = api.deletePost("Token ${user.token}", postId)
+
+                                                    if(response.isSuccessful){
+                                                        navController.popBackStack()
+                                                    }
+                                                    else{
+                                                        errorMessage = "Errore nella cancellazione del post (${response.code()})"
+                                                    }
+                                                }
+                                                catch(e: Exception){
+                                                    errorMessage = "Errore durante la cancellazione: ${e.localizedMessage}"
+                                                }
+                                                finally{
+                                                    isDeleting = false
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Text("Conferma")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeletePostDialog = false }) {
+                                        Text("Annulla")
+                                    }
+                                },
+                                title = { Text("Eliminare questo post?") },
+                                text = { Text("Questa azione non può essere annullata.") }
+                            )
                         }
                     }
 
@@ -602,19 +681,21 @@ fun PostDetailPage(
                         var cAuthorWithBadge by remember { mutableStateOf<UserWithBadge?>(null) }
 
                         //carica badge
-                        LaunchedEffect(author){
-                            if(author != null){
+                        LaunchedEffect(author) {
+                            if (author != null) {
                                 try {
-                                    val response = api.getBadge("Token ${AuthManager.token}", tripId, commentAuthor!!.id)
+                                    val response = api.getBadge(
+                                        "Token ${user.token}",
+                                        tripId,
+                                        commentAuthor!!.id
+                                    )
 
-                                    if(response.isSuccessful){
+                                    if (response.isSuccessful) {
                                         cAuthorWithBadge = response.body()
-                                    }
-                                    else{
+                                    } else {
                                         errorMessage = "Errore nel recupero del badge"
                                     }
-                                }
-                                catch(e: Exception){
+                                } catch (e: Exception) {
                                     errorMessage = "Errore di rete: ${e.message ?: "sconosciuto"}"
                                 }
                             }
@@ -626,18 +707,18 @@ fun PostDetailPage(
                                 .fillMaxWidth()
                                 .padding(vertical = 8.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                    alpha = 0.7f
+                                )
                             )
                         ) {
                             Column(
                                 modifier = Modifier.padding(12.dp)
                             ) {
-                                //intestazione commento con avatar e nome utente
+                                //intestazione commento con avatar, nome utente e cestino
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    BadgeComponent(cAuthorWithBadge, Modifier)
-
                                     AsyncImage(
                                         model = Constants.BASE_URL + commentAuthor?.avatar,
                                         contentDescription = "Avatar di ${commentAuthor?.username}",
@@ -658,13 +739,10 @@ fun PostDetailPage(
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold
                                     )
-                                    Spacer(modifier = Modifier.weight(1f))
+                                    Spacer(modifier = Modifier.width(8.dp))
 
-                                    Text(
-                                        text = formatDate(comment.created_at),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                    )
+                                    BadgeComponent(cAuthorWithBadge, Modifier)
+                                    Spacer(modifier = Modifier.weight(1f))
 
                                     if (comment.author == user.user!!.id) {
                                         Box(
@@ -693,6 +771,20 @@ fun PostDetailPage(
                                     text = comment.text,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                //data del commento
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Text(
+                                        text = formatDate(comment.created_at),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
                             }
                         }
                     }
@@ -722,7 +814,7 @@ fun PostDetailPage(
                                 commentToDelete?.let { comment ->
                                     coroutineScope.launch {
                                         try {
-                                            val response = api.deleteComment("Token ${AuthManager.token}", postId, comment.id)
+                                            val response = api.deleteComment("Token ${user.token}", postId, comment.id)
 
                                             if(response.isSuccessful){
                                                 comments = comments.filterNot { it.id == comment.id }
@@ -788,7 +880,7 @@ fun PostDetailPage(
                                     coroutineScope.launch {
                                         try {
                                             val request = CreateCommentRequest(commentText.trim())
-                                            val response = api.createComment("Token ${AuthManager.token}", postId, request)
+                                            val response = api.createComment("Token ${user.token}", postId, request)
 
                                             if(response.isSuccessful){
                                                 val newComment = response.body()

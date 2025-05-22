@@ -109,7 +109,7 @@ fun Home(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(userViewModel.trips ?: emptyList()) { tripId ->
-                    TripCard(tripId, api, navController)
+                    TripCard(tripId, api, navController, userViewModel)
                 }
             }
 
@@ -204,7 +204,7 @@ fun handleLogout(
     navController: NavController,
     userViewModel: UserViewModel
 ){
-    AuthManager.token = null
+    //AuthManager.token = null
     userViewModel.logout()
 
     navController.navigate("auth") {
@@ -226,7 +226,7 @@ fun EditProfile(
     var email by remember { mutableStateOf(user?.email ?: "") }
     var password by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf(user?.bio ?: "") }
-    var avatarUri by remember { mutableStateOf<Uri?>(user?.avatar?.toUri()) }
+    var avatarUri by remember { mutableStateOf(user?.avatar?.toUri()) }
     var isLoading by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showSuccessMessage by remember { mutableStateOf(false) }
@@ -302,7 +302,7 @@ fun EditProfile(
                                     }
 
                                     try {
-                                        val response = api.updateUser("Token ${AuthManager.token!!}", parts)
+                                        val response = api.updateUser("Token ${userViewModel.token}", parts)
 
                                         if(response.isSuccessful){
                                             userViewModel.loadUser(api)
@@ -563,7 +563,7 @@ fun EditProfile(
 fun TripButtonMenu(
     api: TripTalesApi,
     coroutineScope: CoroutineScope,
-    userViewModel: UserViewModel
+    user: UserViewModel
 ){
     var expanded by remember { mutableStateOf(false) }
     var showCreateTripDialog by remember { mutableStateOf(false) }
@@ -622,10 +622,10 @@ fun TripButtonMenu(
     }
 
     if(showCreateTripDialog){
-        CreateTripDialog(api, coroutineScope, userViewModel, onDismiss = { showCreateTripDialog = false })
+        CreateTripDialog(api, coroutineScope, user, onDismiss = { showCreateTripDialog = false })
     }
     else if(showJoinTripDialog){
-        JoinTripDialog(api, coroutineScope, userViewModel, onDismiss = { showJoinTripDialog = false })
+        JoinTripDialog(api, coroutineScope, user, onDismiss = { showJoinTripDialog = false })
     }
 }
 
@@ -634,7 +634,7 @@ fun TripButtonMenu(
 fun CreateTripDialog(
     api: TripTalesApi,
     coroutineScope: CoroutineScope,
-    userViewModel: UserViewModel,
+    user: UserViewModel,
     onDismiss: () -> Unit
 ){
     var name by remember { mutableStateOf("") }
@@ -688,11 +688,11 @@ fun CreateTripDialog(
                 onClick = {
                     coroutineScope.launch {
                         try{
-                            val response = api.createTrip("Token ${AuthManager.token!!}", CreateTripRequest(name, description))
+                            val response = api.createTrip("Token ${user.token}", CreateTripRequest(name, description))
 
                             if(response.isSuccessful){
                                 Toast.makeText(context, "Trip creato con successo!", Toast.LENGTH_SHORT).show()
-                                userViewModel.loadUser(api) //ricarico le informazioni dell'utente
+                                user.loadUser(api) //ricarico le informazioni dell'utente
                                 onDismiss()
                             }
                             else{   //DA TOGLIERE
@@ -721,7 +721,7 @@ fun CreateTripDialog(
 fun JoinTripDialog(
     api: TripTalesApi,
     coroutineScope: CoroutineScope,
-    userViewModel: UserViewModel,
+    user: UserViewModel,
     onDismiss: () -> Unit
 ){
     var idText by remember { mutableStateOf("") }
@@ -734,7 +734,7 @@ fun JoinTripDialog(
             OutlinedTextField(
                 value = idText,
                 onValueChange = { newValue ->   //filtra solo i numeri
-                    if (newValue.all { it.isDigit() }) {
+                    if(newValue.all { it.isDigit() }){
                         idText = newValue
                     }
                 },
@@ -759,12 +759,12 @@ fun JoinTripDialog(
                             val id = idText.toIntOrNull()
 
                             if(id != null){
-                                val response = api.joinTrip("Token ${AuthManager.token!!}", id)
+                                val response = api.joinTrip("Token ${user.token}", id)
 
                                 if(response.isSuccessful){
                                     val message = response.body()?.message
                                     println("$message")
-                                    userViewModel.loadUser(api) //ricarico le informazioni dell'utente
+                                    user.loadUser(api)  //ricarico le informazioni dell'utente
                                     onDismiss()
                                 }
                             }
@@ -791,16 +791,17 @@ fun JoinTripDialog(
 fun TripCard(
     tripId: Int,
     api: TripTalesApi,
-    navController: NavController
+    navController: NavController,
+    user: UserViewModel
 ){
     var trip by remember { mutableStateOf<Trip?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(tripId) {
         try{
-            val response = AuthManager.token?.let { token -> api.getTripInfo("Token $token", tripId) }
+            val response = api.getTripInfo("Token ${user.token}", tripId)
 
-            if(response != null && response.isSuccessful){
+            if(response.isSuccessful){
                 trip = response.body()
             }
             else{

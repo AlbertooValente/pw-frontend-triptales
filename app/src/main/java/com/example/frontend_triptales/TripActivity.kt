@@ -44,13 +44,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -89,12 +89,12 @@ fun TripHome(
 ){
     var trip by remember { mutableStateOf<Trip?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var selectedTab by remember { mutableStateOf(0) } // 0 = bacheca, 1 = mappa, 2 = classifica
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = bacheca, 1 = mappa, 2 = classifica
     var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
 
     LaunchedEffect(id) {
         try {
-            val response = api.getTripInfo("Token ${AuthManager.token!!}", id)
+            val response = api.getTripInfo("Token ${user.token}", id)
 
             if(response.isSuccessful){
                 trip = response.body()
@@ -109,9 +109,9 @@ fun TripHome(
     }
 
     //carica post
-    LaunchedEffect(trip?.id) {
+    LaunchedEffect(selectedTab, trip?.id) {
         if(trip != null){
-            val response = api.getPosts("Token ${AuthManager.token}", trip!!.id)
+            val response = api.getPosts("Token ${user.token}", trip!!.id)
 
             if(response.isSuccessful){
                 posts = response.body() ?: emptyList()
@@ -119,21 +119,66 @@ fun TripHome(
         }
     }
 
-    Scaffold(
-        floatingActionButton = {
-            if(selectedTab == 0 && trip != null){
-                FloatingActionButton(
-                    onClick = { navController.navigate("create_post/${id}") },
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Aggiungi"
-                    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                contentAlignment = Alignment.TopCenter,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+            ) {
+                when {
+                    trip != null -> {
+                        when (selectedTab) {
+                            0 -> {
+                                Bacheca(trip, posts, api, navController, user, coroutineScope)
+                            }
+                            1 -> {
+                                var postWithImages by remember { mutableStateOf<List<PostWithImage>>(emptyList()) }
+
+                                LaunchedEffect(Unit) {
+                                    postWithImages = loadPostWithImages(api, posts, user)
+                                }
+
+                                Mappa(postWithImages, navController)
+                            }
+                            2 -> {
+                                Classifiche(trip, api, coroutineScope, user)
+                            }
+                        }
+                    }
+                    error != null -> {
+                        Text(
+                            text = error ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    else -> {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                //pulsante aggiungi post
+                if(selectedTab == 0 && trip != null){
+                    FloatingActionButton(
+                        onClick = { navController.navigate("create_post/${id}") },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Aggiungi"
+                        )
+                    }
                 }
             }
-        },
-        bottomBar = {
+
             NavigationBar {
                 NavigationBarItem(
                     selected = selectedTab == 0,
@@ -153,46 +198,6 @@ fun TripHome(
                     icon = { Icon(Icons.Filled.Star, contentDescription = "Classifica") },
                     label = { Text("Classifica") }
                 )
-            }
-        }
-    ) { paddingValues ->
-        Box(
-            contentAlignment = Alignment.TopCenter,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            when {
-                trip != null -> {
-                    when (selectedTab) {
-                        0 -> {
-                            Bacheca(trip, posts, api, navController, user, coroutineScope)
-                        }
-                        1 -> {
-                            var postWithImages by remember { mutableStateOf<List<PostWithImage>>(emptyList()) }
-
-                            LaunchedEffect(Unit) {
-                                postWithImages = loadPostWithImages(api, posts)
-                            }
-
-                            Mappa(postWithImages, navController)
-                        }
-                        2 -> {
-                            Classifiche(trip, api, coroutineScope)
-                        }
-                    }
-                }
-                error != null -> {
-                    Text(
-                        text = error ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
-                else -> {
-                    CircularProgressIndicator()
-                }
             }
         }
     }
@@ -342,10 +347,10 @@ data class PostWithImage(
     val image: Image
 )
 
-suspend fun loadPostWithImages(api: TripTalesApi, posts: List<Post>): List<PostWithImage> {
+suspend fun loadPostWithImages(api: TripTalesApi, posts: List<Post>, user: UserViewModel): List<PostWithImage> {
     return posts.mapNotNull { post ->
         try{
-            val response = api.getImage("Token ${AuthManager.token}", post.image)
+            val response = api.getImage("Token ${user.token}", post.image)
 
             if(response.isSuccessful && response.body() != null){
                 PostWithImage(post, response.body()!!)
@@ -492,7 +497,8 @@ fun rememberBitmapDescriptorFromUrl(fullUrl: String): State<BitmapDescriptor?> {
 fun Classifiche(
     trip: Trip?,
     api: TripTalesApi,
-    coroutineScope: CoroutineScope
+    coroutineScope: CoroutineScope,
+    user: UserViewModel
 ){
     //gestione dropdown menu
     var selectedClassifica by remember { mutableStateOf("Post con più like") }
@@ -522,7 +528,7 @@ fun Classifiche(
             errorMessage = null
 
             try {
-                val token = "Token ${AuthManager.token}"
+                val token = "Token ${user.token}"
 
                 when (selectedClassifica) {
                     "Post con più like" -> {

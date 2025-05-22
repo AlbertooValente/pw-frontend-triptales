@@ -210,9 +210,9 @@ interface TripTalesApi {
     ): Response<Unit>
 }
 
-//salvo l'ip del server come variabile globale
+//salvo l'ip/dominio ngrok del server come variabile globale
 object Constants {
-    const val BASE_URL = "http://192.168.63.5:8000"  //da sostituire ogni volta con l'ip del backend
+    const val BASE_URL = "https://light-active-shrimp.ngrok-free.app"  //da sostituire ogni volta con l'ip del backend o con un dominio ngrok
 }
 
 object RetrofitInstance {

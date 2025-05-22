@@ -16,11 +16,18 @@ class UserViewModel : ViewModel() { //per tenere salvati i dati dell'utente
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
+    var token by mutableStateOf<String?>(null)
+        private set
+
+
+    fun setUserToken(strToken: String){
+        token = strToken
+    }
 
     fun loadUser(api: TripTalesApi) {
         viewModelScope.launch {
             try {
-                val response = api.getUser("Token ${AuthManager.token!!}")
+                val response = api.getUser("Token $token")
 
                 if(response.isSuccessful){
                     user = response.body()
@@ -40,7 +47,7 @@ class UserViewModel : ViewModel() { //per tenere salvati i dati dell'utente
     private fun loadTrips(api: TripTalesApi){
         viewModelScope.launch {
             try {
-                val response = api.getTrips("Token ${AuthManager.token!!}")
+                val response = api.getTrips("Token $token")
 
                 if(response.isSuccessful){
                     trips = response.body()
@@ -60,5 +67,6 @@ class UserViewModel : ViewModel() { //per tenere salvati i dati dell'utente
     fun logout() {
         user = null
         errorMessage = null
+        token = null
     }
 }

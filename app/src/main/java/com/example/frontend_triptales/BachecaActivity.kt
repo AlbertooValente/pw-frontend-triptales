@@ -99,7 +99,8 @@ fun CreatePostScreen(
     api: TripTalesApi,
     coroutineScope: CoroutineScope,
     navController: NavController,
-    tripId: Int
+    tripId: Int,
+    user: UserViewModel
 ) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(false) }
@@ -329,7 +330,7 @@ fun CreatePostScreen(
                                     val desc = imageDescription.value.toRequestBody("text/plain".toMediaType())
 
                                     //carica immagine
-                                    val imageResponse = api.caricaImage("Token ${AuthManager.token}", imagePart, desc, lat, lon)
+                                    val imageResponse = api.caricaImage("Token ${user.token}", imagePart, desc, lat, lon)
 
                                     if(imageResponse.isSuccessful){
                                         val imageId = imageResponse.body()!!.id
@@ -343,7 +344,7 @@ fun CreatePostScreen(
                                         )
 
                                         val postResponse = api.creaPost(
-                                            "Token ${AuthManager.token!!}",
+                                            "Token ${user.token}",
                                             postRequest
                                         )
 
@@ -470,7 +471,7 @@ fun PostItem(
     LaunchedEffect(post.image) {
         post.image.let { imageId ->
             try {
-                val response = api.getImage("Token ${AuthManager.token}", imageId)
+                val response = api.getImage("Token ${user.token}", imageId)
 
                 if(response.isSuccessful){
                     image = response.body()
@@ -488,7 +489,7 @@ fun PostItem(
     //carica autore
     LaunchedEffect(post.created_by) {
         try {
-            val response = api.getUserById("Token ${AuthManager.token}", post.created_by)
+            val response = api.getUserById("Token ${user.token}", post.created_by)
 
             if(response.isSuccessful){
                 author = response.body()
@@ -506,7 +507,7 @@ fun PostItem(
     LaunchedEffect(author) {
         if(author != null){
             try {
-                val response = api.getBadge("Token ${AuthManager.token}", tripId, author!!.id)
+                val response = api.getBadge("Token ${user.token}", tripId, author!!.id)
 
                 if(response.isSuccessful){
                     authorWithBadge = response.body()
@@ -545,6 +546,7 @@ fun PostItem(
                                     api = api,
                                     postId = post.id,
                                     isLiked = isLiked,
+                                    user = user,
                                     onSuccess = {
                                         isLiked = it
                                         numLike += if (it) 1 else -1
@@ -583,6 +585,7 @@ fun PostItem(
                                     api = api,
                                     postId = post.id,
                                     isLiked = isLiked,
+                                    user = user,
                                     onSuccess = {
                                         isLiked = it
                                         numLike += if (it) 1 else -1
@@ -613,7 +616,7 @@ fun PostItem(
                     )
 
                     //icona cestino solo per autore
-                    if (isAuthor) {
+                    if(isAuthor){
                         IconButton(onClick = { expanded = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                         }
@@ -726,7 +729,8 @@ fun PostItem(
                         isDeleting = true
                         coroutineScope.launch {
                             try {
-                                val response = api.deletePost("Token ${AuthManager.token}", post.id)
+                                val response = api.deletePost("Token ${user.token}", post.id)
+
                                 if(response.isSuccessful){
                                     //ricarica la pagina corrente
                                     navController.popBackStack()
@@ -764,15 +768,16 @@ suspend fun handleToggleLike(
     api: TripTalesApi,
     postId: Int,
     isLiked: Boolean,
+    user: UserViewModel,
     onSuccess: (newIsLiked: Boolean) -> Unit,
     onError: (String) -> Unit
 ) {
     try{
         val response = if(isLiked){
-            api.giveUnlike("Token ${AuthManager.token}", postId)
+            api.giveUnlike("Token ${user.token}", postId)
         }
         else{
-            api.giveLike("Token ${AuthManager.token}", postId)
+            api.giveLike("Token ${user.token}", postId)
         }
 
         if(response.isSuccessful){
@@ -811,7 +816,8 @@ fun EditPostScreen(
     api: TripTalesApi,
     postId: Int,
     navController: NavController,
-    coroutineScope: CoroutineScope
+    coroutineScope: CoroutineScope,
+    user: UserViewModel
 ) {
     var post by remember { mutableStateOf<Post?>(null) }
     var title by remember { mutableStateOf(post?.title ?: "") }
@@ -824,13 +830,13 @@ fun EditPostScreen(
 
     LaunchedEffect(postId) {
         try {
-            val postResponse = api.getPost("Token ${AuthManager.token}", postId)
+            val postResponse = api.getPost("Token ${user.token}", postId)
 
             if(postResponse.isSuccessful){
                 post = postResponse.body()
 
                 post?.image?.let { imageId ->
-                    val imgResp = api.getImage("Token ${AuthManager.token}", imageId)
+                    val imgResp = api.getImage("Token ${user.token}", imageId)
                     if (imgResp.isSuccessful) image = imgResp.body()
                 }
             }
@@ -869,7 +875,7 @@ fun EditPostScreen(
                             parts.add(MultipartBody.Part.createFormData("description", description))
 
                             try {
-                                val response = api.updatePost("Token ${AuthManager.token}", postId, parts)
+                                val response = api.updatePost("Token ${user.token}", postId, parts)
 
                                 if(response.isSuccessful){
                                     showSuccessMessage = true
