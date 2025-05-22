@@ -1,6 +1,9 @@
+@file:Suppress("DEPRECATION")
+
 package com.example.frontend_triptales
 
 import android.graphics.BitmapFactory
+import android.location.Geocoder
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -88,6 +91,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URL
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -286,6 +290,27 @@ fun PostDetailPage(
 
             //gestione dropdown modifica/elimina post
             var expanded by remember { mutableStateOf(false) }
+
+            //caricamento posizione dell'immagine
+            var address by remember { mutableStateOf<String?>(null) }
+
+            LaunchedEffect(image?.latitude, image?.longitude) {
+                withContext(Dispatchers.IO) {
+                    try{
+                        val geocoder = Geocoder(localContext, Locale.getDefault())
+                        val result = geocoder.getFromLocation(image!!.latitude, image!!.longitude, 1)
+                        val addr = result?.firstOrNull()?.getAddressLine(0)
+                        withContext(Dispatchers.Main) {
+                            address = addr ?: "Indirizzo non trovato"
+                        }
+                    }
+                    catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            address = "Errore geocoding"
+                        }
+                    }
+                }
+            }
 
             //caricamento dei commenti all'avvio
             LaunchedEffect(postId) {
@@ -504,7 +529,7 @@ fun PostDetailPage(
                                 Spacer(modifier = Modifier.width(4.dp))
 
                                 Text(
-                                    text = "Lat: ${image!!.latitude} - Long: ${image!!.longitude}",
+                                    text = address ?: "Lat: ${image?.latitude} - Long: ${image?.longitude}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                 )
